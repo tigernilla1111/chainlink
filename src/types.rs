@@ -1,24 +1,26 @@
-use sha2::{Digest, Sha512};
-
-use crate::crypto::HashBytes;
-
-struct PostId(HashBytes);
-struct CommentId(HashBytes);
+use crate::crypto::{HashBytes, PublicKeyBytes, SignatureBytes};
 
 /// A set of `LedgerItem`s will be within each block
 /// When a block is discovered, all items will get assigned unique IDs before being stored
-pub enum LedgerItem {
+#[derive(serde::Serialize, serde::Deserialize)]
+pub enum LedgerUpdateType {
     Post {
-        author: crate::crypto::PublicKeyBytes,
         content: String,
     },
     Comment {
-        author: crate::crypto::PublicKeyBytes,
-        parent_id: Option<CommentId>,
+        post_id: HashBytes,
+        parent_id: Option<HashBytes>,
         content: String,
     },
 }
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct LedgerUpdate {
+    author: PublicKeyBytes,
+    data: LedgerUpdateType,
+}
 
-struct SignedLedgerItem {
-    signature: crate::crypto::SignatureBytes,
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct SignedLedgerUpdateBytes {
+    pub signature: SignatureBytes,
+    pub canonical_bytes: Vec<u8>,
 }

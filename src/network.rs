@@ -12,6 +12,8 @@ use tokio::sync::Mutex;
 use tokio::sync::mpsc::{
     UnboundedReceiver as Receiver, UnboundedSender as Sender, unbounded_channel,
 };
+
+use crate::types::SignedLedgerUpdateBytes;
 const RPC_REQUEST_TIMEOUT_SECS: u64 = 5;
 
 type PubKey = String;
@@ -21,17 +23,19 @@ pub trait MyRpc {
     #[method(name = "ping")]
     async fn ping(&self) -> RpcResult<()>;
     #[method(name = "gossip")]
-    async fn gossip(&self, msg: GossipData) -> RpcResult<()>;
+    async fn ledger_update_gossip(&self, msg: SignedLedgerUpdateBytes) -> RpcResult<()>;
     #[method(name = "block_gossip")]
     async fn block_gossip(&self) -> RpcResult<()>;
 }
 
 struct Server {
-    gossip_sender: Sender<GossipData>,
+    update_sender: Sender<SignedLedgerUpdateBytes>,
 }
 impl Server {
-    fn new(gossip_sender: Sender<GossipData>) -> Self {
-        Self { gossip_sender }
+    fn new(gossip_sender: Sender<SignedLedgerUpdateBytes>) -> Self {
+        Self {
+            update_sender: gossip_sender,
+        }
     }
 }
 #[async_trait]
@@ -40,19 +44,18 @@ impl MyRpcServer for Server {
         println!("got ping");
         Ok(())
     }
-    async fn gossip(&self, msg: GossipData) -> RpcResult<()> {
-        self.gossip_sender.send(msg);
+    async fn ledger_update_gossip(&self, msg: SignedLedgerUpdateBytes) -> RpcResult<()> {
+        self.update_sender.send(msg).unwrap();
         Ok(())
     }
     async fn block_gossip(&self) -> RpcResult<()> {
         todo!()
     }
 }
-type GossipData = String;
 
 pub struct Interface {
     addr: SocketAddr,
-    gossip_rx: Option<Receiver<GossipData>>,
+    gossip_rx: Option<Receiver<SignedLedgerUpdateBytes>>,
     // TODO: move mutable structs into a State protocol
     // Define a lock order on these structs to prevent dead locks
     clients: HashMap<SocketAddr, Arc<HttpClient>>,
@@ -80,13 +83,13 @@ impl Interface {
             addr_book: HashMap::new(),
         }
     }
-    pub fn subscribe_to_gossips(&mut self) -> Option<Receiver<GossipData>> {
+    pub fn subscribe_to_gossips(&mut self) -> Option<Receiver<SignedLedgerUpdateBytes>> {
         self.gossip_rx.take()
     }
     pub async fn add_addr(&mut self, pubkey: PubKey, addr: SocketAddr) {
         self.addr_book.insert(pubkey, addr);
     }
-    pub async fn send_gossip(&mut self, rcvr: &PubKey, msg_data: &GossipData) {
+    pub async fn send_gossip(&mut self, rcvr: &PubKey, msg_data: &SignedLedgerUpdateBytes) {
         let Some(&rcvr_addr) = self.addr_book.get(rcvr) else {
             eprintln!("recipient address {rcvr} not found in address book, skipping send");
             return;
@@ -96,7 +99,7 @@ impl Interface {
 
         match tokio::time::timeout(
             Duration::from_secs(RPC_REQUEST_TIMEOUT_SECS),
-            client.gossip(msg_data.clone()),
+            client.ledger_update_gossip(msg_data.clone()),
         )
         .await
         {

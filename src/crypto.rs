@@ -1,6 +1,5 @@
 use std::hash::Hash;
 
-use bincode::serde::encode_to_vec;
 use ed25519_dalek::Verifier;
 use ed25519_dalek::ed25519::signature::Signer;
 use rand_core::OsRng;
@@ -8,7 +7,6 @@ use serde_bytes;
 use sha2::{Digest, Sha512};
 use thiserror;
 
-const MAX_ENCODING_BYTES: usize = 10000;
 const SHA512_OUTPUT_BYTES: usize = 64;
 
 #[derive(thiserror::Error, Debug)]
@@ -57,11 +55,8 @@ impl PrivateKey {
         PublicKeyBytes(self.0.verifying_key().to_bytes())
     }
 
-    pub fn sign_msg_hash<T: serde::Serialize>(
-        &self,
-        data: &T,
-    ) -> Result<(SignatureBytes, HashBytes), CryptoError> {
-        let hasher = msg_hasher(data)?;
+    pub fn sign_msg(&self, data: &Vec<u8>) -> Result<(SignatureBytes, HashBytes), CryptoError> {
+        let hasher = msg_hasher(data);
         let sig = self
             .0
             .sign_prehashed(hasher.clone(), None)
@@ -74,12 +69,12 @@ impl PrivateKey {
     }
 }
 
-pub fn verify_msg<T: serde::Serialize>(
+pub fn verify_msg(
     sig: &SignatureBytes,
-    data: &T,
+    data: &Vec<u8>,
     sender: PublicKeyBytes,
 ) -> Result<HashBytes, CryptoError> {
-    let hasher = msg_hasher(data)?;
+    let hasher = msg_hasher(data);
 
     let pubkey = sender.to_verifying_key()?;
     pubkey
@@ -89,17 +84,8 @@ pub fn verify_msg<T: serde::Serialize>(
     Ok(HashBytes(hasher.finalize().into()))
 }
 
-fn canonical_bytes<T: serde::Serialize>(value: &T) -> Result<Vec<u8>, CryptoError> {
-    let cfg = bincode::config::standard()
-        .with_little_endian()
-        .with_fixed_int_encoding()
-        .with_limit::<MAX_ENCODING_BYTES>();
-
-    encode_to_vec(value, cfg).map_err(|_| CryptoError::Serialization)
-}
-
-fn msg_hasher<T: serde::Serialize>(data: &T) -> Result<Sha512, CryptoError> {
+fn msg_hasher(data: &Vec<u8>) -> Sha512 {
     let mut h = Sha512::new();
-    h.update(canonical_bytes(data)?);
-    Ok(h)
+    h.update(data);
+    h
 }
