@@ -1,13 +1,12 @@
 use std::hash::Hash;
 
+use crate::types::{HashBytes, SignatureBytes};
 use ed25519_dalek::Verifier;
 use ed25519_dalek::ed25519::signature::Signer;
 use rand_core::OsRng;
 use serde_bytes;
 use sha2::{Digest, Sha512};
 use thiserror;
-
-const SHA512_OUTPUT_BYTES: usize = 64;
 
 #[derive(thiserror::Error, Debug)]
 pub enum CryptoError {
@@ -21,15 +20,9 @@ pub enum CryptoError {
     Serialization,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, Hash)]
-pub struct HashBytes(#[serde(with = "serde_bytes")] [u8; SHA512_OUTPUT_BYTES]);
-
-#[derive(Clone, serde::Serialize, serde::Deserialize, Debug)]
-pub struct SignatureBytes(#[serde(with = "serde_bytes")] [u8; ed25519_dalek::SIGNATURE_LENGTH]);
-
-impl SignatureBytes {
-    fn to_signature(&self) -> ed25519_dalek::Signature {
-        ed25519_dalek::Signature::from_bytes(&self.0)
+impl From<SignatureBytes> for ed25519_dalek::Signature {
+    fn from(value: SignatureBytes) -> Self {
+        ed25519_dalek::Signature::from_bytes(&value)
     }
 }
 
@@ -63,8 +56,8 @@ impl PrivateKey {
             .map_err(|_| CryptoError::Serialization)?;
 
         Ok((
-            SignatureBytes(sig.to_bytes()),
-            HashBytes(hasher.finalize().into()),
+            SignatureBytes::new(sig.to_bytes()),
+            HashBytes::new(hasher.finalize().into()),
         ))
     }
 }
@@ -77,11 +70,12 @@ pub fn verify_msg(
     let hasher = msg_hasher(data);
 
     let pubkey = sender.to_verifying_key()?;
+    let sig: ed25519_dalek::Signature = (*sig).into();
     pubkey
-        .verify_prehashed(hasher.clone(), None, &sig.to_signature())
+        .verify_prehashed(hasher.clone(), None, &sig)
         .map_err(|_| CryptoError::InvalidSignature(sender))?;
 
-    Ok(HashBytes(hasher.finalize().into()))
+    Ok(HashBytes::new(hasher.finalize().into()))
 }
 
 fn msg_hasher(data: &Vec<u8>) -> Sha512 {

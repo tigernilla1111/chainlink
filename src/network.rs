@@ -13,7 +13,8 @@ use tokio::sync::mpsc::{
     UnboundedReceiver as Receiver, UnboundedSender as Sender, unbounded_channel,
 };
 
-use crate::types::SignedLedgerUpdateBytes;
+use crate::types::SignatureBytes;
+
 const RPC_REQUEST_TIMEOUT_SECS: u64 = 5;
 
 type PubKey = String;
@@ -23,16 +24,16 @@ pub trait MyRpc {
     #[method(name = "ping")]
     async fn ping(&self) -> RpcResult<()>;
     #[method(name = "gossip")]
-    async fn ledger_update_gossip(&self, msg: SignedLedgerUpdateBytes) -> RpcResult<()>;
+    async fn ledger_update_gossip(&self, msg: SignedLedgerUpdate) -> RpcResult<()>;
     #[method(name = "block_gossip")]
     async fn block_gossip(&self) -> RpcResult<()>;
 }
 
 struct Server {
-    update_sender: Sender<SignedLedgerUpdateBytes>,
+    update_sender: Sender<SignedLedgerUpdate>,
 }
 impl Server {
-    fn new(gossip_sender: Sender<SignedLedgerUpdateBytes>) -> Self {
+    fn new(gossip_sender: Sender<SignedLedgerUpdate>) -> Self {
         Self {
             update_sender: gossip_sender,
         }
@@ -44,7 +45,8 @@ impl MyRpcServer for Server {
         println!("got ping");
         Ok(())
     }
-    async fn ledger_update_gossip(&self, msg: SignedLedgerUpdateBytes) -> RpcResult<()> {
+    async fn ledger_update_gossip(&self, msg: SignedLedgerUpdate) -> RpcResult<()> {
+        println!("received ledger update RPC");
         self.update_sender.send(msg).unwrap();
         Ok(())
     }
@@ -55,7 +57,7 @@ impl MyRpcServer for Server {
 
 pub struct Interface {
     addr: SocketAddr,
-    gossip_rx: Option<Receiver<SignedLedgerUpdateBytes>>,
+    gossip_rx: Option<Receiver<SignedLedgerUpdate>>,
     // TODO: move mutable structs into a State protocol
     // Define a lock order on these structs to prevent dead locks
     clients: HashMap<SocketAddr, Arc<HttpClient>>,
@@ -129,4 +131,10 @@ impl Interface {
         });
         client.clone()
     }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct SignedLedgerUpdate {
+    pub signature: SignatureBytes,
+    pub canonical_bytes: Vec<u8>,
 }

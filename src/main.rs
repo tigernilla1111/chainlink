@@ -1,7 +1,7 @@
 use crate::{
     crypto::PrivateKey,
-    network::Interface,
-    types::{LedgerUpdate, SignedLedgerUpdateBytes},
+    network::{Interface, SignedLedgerUpdate},
+    types::LedgerUpdate,
     util::{deserialize, serialize},
 };
 
@@ -16,7 +16,7 @@ async fn main() {
     let mut iface = Interface::new("127.0.0.1:0").await;
     let mut ledger_update_rcvr = iface.subscribe_to_gossips().unwrap();
     while let Some(update) = ledger_update_rcvr.recv().await {
-        let SignedLedgerUpdateBytes {
+        let SignedLedgerUpdate {
             signature,
             canonical_bytes,
         } = update;
@@ -45,10 +45,10 @@ async fn main() {
     // }
 }
 
-fn sign(update: LedgerUpdate, priv_key: PrivateKey) -> SignedLedgerUpdateBytes {
+fn sign(update: LedgerUpdate, priv_key: PrivateKey) -> SignedLedgerUpdate {
     let canonical_bytes = serialize(&update).unwrap();
     let (signature, _) = priv_key.sign_msg(&canonical_bytes).unwrap();
-    SignedLedgerUpdateBytes {
+    SignedLedgerUpdate {
         signature,
         canonical_bytes,
     }
