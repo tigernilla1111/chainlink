@@ -85,13 +85,13 @@ impl Interface {
             addr_book: HashMap::new(),
         }
     }
-    pub fn subscribe_to_gossips(&mut self) -> Option<Receiver<SignedLedgerUpdateBytes>> {
+    pub fn subscribe_to_gossips(&mut self) -> Option<Receiver<SignedLedgerUpdate>> {
         self.gossip_rx.take()
     }
     pub async fn add_addr(&mut self, pubkey: PubKey, addr: SocketAddr) {
         self.addr_book.insert(pubkey, addr);
     }
-    pub async fn send_gossip(&mut self, rcvr: &PubKey, msg_data: &SignedLedgerUpdateBytes) {
+    pub async fn send_gossip(&mut self, rcvr: &PubKey, msg_data: &SignedLedgerUpdate) {
         let Some(&rcvr_addr) = self.addr_book.get(rcvr) else {
             eprintln!("recipient address {rcvr} not found in address book, skipping send");
             return;
@@ -133,8 +133,9 @@ impl Interface {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Eq, PartialEq, Hash)]
 pub struct SignedLedgerUpdate {
     pub signature: SignatureBytes,
+    /// Serialized [`crate::types::LedgerUpdate`]
     pub canonical_bytes: Vec<u8>,
 }

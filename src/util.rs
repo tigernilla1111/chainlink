@@ -21,7 +21,7 @@ pub fn deserialize<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T, De
 
     let (value, bytes_read) = decode_from_slice(bytes, cfg)?;
 
-    // Optional but recommended: ensure no trailing bytes
+    // ensure no trailing bytes
     if bytes_read != bytes.len() {
         return Err(DecodeError::Other("trailing bytes".into()));
     }

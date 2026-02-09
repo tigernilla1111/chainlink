@@ -1,6 +1,6 @@
 use std::hash::Hash;
 
-use crate::types::{HashBytes, SignatureBytes};
+use crate::types::{HashBytes, PublicKeyBytes, SignatureBytes};
 use ed25519_dalek::Verifier;
 use ed25519_dalek::ed25519::signature::Signer;
 use rand_core::OsRng;
@@ -25,14 +25,12 @@ impl From<SignatureBytes> for ed25519_dalek::Signature {
         ed25519_dalek::Signature::from_bytes(&value)
     }
 }
+impl TryFrom<PublicKeyBytes> for ed25519_dalek::VerifyingKey {
+    type Error = CryptoError;
 
-#[derive(serde::Deserialize, serde::Serialize, PartialEq, Eq, Hash, Clone, Copy, Debug)]
-pub struct PublicKeyBytes(pub [u8; ed25519_dalek::PUBLIC_KEY_LENGTH]);
-
-impl PublicKeyBytes {
-    fn to_verifying_key(self) -> Result<ed25519_dalek::VerifyingKey, CryptoError> {
-        ed25519_dalek::VerifyingKey::from_bytes(&self.0)
-            .map_err(|_| CryptoError::InvalidPublicKey(self))
+    fn try_from(value: PublicKeyBytes) -> Result<Self, Self::Error> {
+        ed25519_dalek::VerifyingKey::from_bytes(&value.0)
+            .map_err(|_| CryptoError::InvalidPublicKey(value))
     }
 }
 
@@ -68,8 +66,7 @@ pub fn verify_msg(
     sender: PublicKeyBytes,
 ) -> Result<HashBytes, CryptoError> {
     let hasher = msg_hasher(data);
-
-    let pubkey = sender.to_verifying_key()?;
+    let pubkey = ed25519_dalek::VerifyingKey::try_from(sender)?;
     let sig: ed25519_dalek::Signature = (*sig).into();
     pubkey
         .verify_prehashed(hasher.clone(), None, &sig)

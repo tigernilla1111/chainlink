@@ -1,26 +1,58 @@
+use std::collections::HashSet;
+
 use crate::{
-    crypto::PrivateKey,
+    crypto::{PrivateKey, verify_msg},
     network::{Interface, SignedLedgerUpdate},
-    types::LedgerUpdate,
+    types::{LedgerUpdate, LedgerUpdateType},
     util::{deserialize, serialize},
 };
 
 mod crypto;
-pub mod network;
+mod network;
 mod types;
 mod util;
 
+use types::HashBytes;
+
 #[tokio::main]
 async fn main() {
-    println!("Hello, world!");
     let mut iface = Interface::new("127.0.0.1:0").await;
     let mut ledger_update_rcvr = iface.subscribe_to_gossips().unwrap();
-    while let Some(update) = ledger_update_rcvr.recv().await {
+    let mut node = Node::new();
+    while let Some(signed_update) = ledger_update_rcvr.recv().await {
         let SignedLedgerUpdate {
             signature,
             canonical_bytes,
-        } = update;
+        } = signed_update.clone();
+
         let update: LedgerUpdate = deserialize(&canonical_bytes).unwrap();
+
+        if verify_msg(&signature, &canonical_bytes, update.author).is_err() {
+            println!("ERROR invalid signature on {update:?}");
+            continue;
+        }
+
+        //validate ledger update against state
+        match update.data {
+            LedgerUpdateType::Comment {
+                parent_post_id,
+                parent_comment_id,
+                content: _,
+            } => {
+                // check if post_id and parent_id are valid
+                if node
+                    .state
+                    .validate_comment(parent_post_id, parent_comment_id)
+                    .is_err()
+                {
+                    println!("ERROR comment is not a valid ledger update");
+                    continue;
+                };
+            }
+            LedgerUpdateType::Post { content } => {}
+        }
+
+        node.mempool.add_ledger_update(signed_update);
     }
 
     // consume the block RPC receiver
@@ -34,15 +66,39 @@ async fn main() {
     //     // Deserialize block
     //     // Verify block
     // }
+}
 
-    // // consume the ledgerUpdate receiver
-    // for update in ledger_update.recv(){
-    // let SignedLedgerUpdateBytes {
-    //      signature,
-    //      canonical_bytes
-    // }
-    // // check against state to see if valid
-    // }
+struct Node {
+    mempool: MemPool,
+    state: State,
+}
+impl Node {
+    fn new() -> Self {
+        Node {
+            mempool: MemPool {
+                inner: HashSet::new(),
+            },
+            state: State,
+        }
+    }
+}
+struct State;
+impl State {
+    fn validate_comment(
+        &self,
+        parent_post_id: HashBytes,
+        parent_comment_id: Option<HashBytes>,
+    ) -> Result<(), ()> {
+        Ok(())
+    }
+}
+struct MemPool {
+    inner: HashSet<SignedLedgerUpdate>,
+}
+impl MemPool {
+    fn add_ledger_update(&mut self, update: SignedLedgerUpdate) {
+        self.inner.insert(update);
+    }
 }
 
 fn sign(update: LedgerUpdate, priv_key: PrivateKey) -> SignedLedgerUpdate {
