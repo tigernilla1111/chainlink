@@ -55,6 +55,7 @@ async fn main() {
         node.mempool.add_ledger_update(signed_update);
     }
 
+    // let block_update_rcvr =
     // consume the block RPC receiver
     // for blockRpc in block_receiver.recv() {
     //     let BlockRpc {
@@ -82,6 +83,14 @@ impl Node {
         }
     }
 }
+
+/// Requirements:
+/// - keep track of each fork, and for each fork keep track of:
+///         - the current state
+///         - block hashes in order
+/// - validate if a block is a valid addition to any of the forks (ie its prev_block_hash is one of the fork heads)
+/// - an immutable base state which gets appended to with a block, `block_a`.  `block_a` is only appended when the
+///   height reaches `block_a.height + x`
 struct State;
 impl State {
     fn validate_comment(

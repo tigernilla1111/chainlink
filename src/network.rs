@@ -7,13 +7,14 @@ use jsonrpsee::core::{RpcResult, async_trait};
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use jsonrpsee::proc_macros::rpc;
 use jsonrpsee::server::ServerBuilder;
+use sha2::digest::block_buffer::Block;
 use tokio::net::ToSocketAddrs;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::{
     UnboundedReceiver as Receiver, UnboundedSender as Sender, unbounded_channel,
 };
 
-use crate::types::SignatureBytes;
+use crate::types::{SignatureBytes, SignedLedgerUpdate};
 
 const RPC_REQUEST_TIMEOUT_SECS: u64 = 5;
 
@@ -26,16 +27,21 @@ pub trait MyRpc {
     #[method(name = "gossip")]
     async fn ledger_update_gossip(&self, msg: SignedLedgerUpdate) -> RpcResult<()>;
     #[method(name = "block_gossip")]
-    async fn block_gossip(&self) -> RpcResult<()>;
+    async fn block_gossip(&self, block: BlockBytesEnvelope) -> RpcResult<()>;
 }
 
 struct Server {
     update_sender: Sender<SignedLedgerUpdate>,
+    block_sender: Sender<BlockBytesEnvelope>,
 }
 impl Server {
-    fn new(gossip_sender: Sender<SignedLedgerUpdate>) -> Self {
+    fn new(
+        update_sender: Sender<SignedLedgerUpdate>,
+        block_sender: Sender<BlockBytesEnvelope>,
+    ) -> Self {
         Self {
-            update_sender: gossip_sender,
+            update_sender,
+            block_sender,
         }
     }
 }
@@ -50,8 +56,10 @@ impl MyRpcServer for Server {
         self.update_sender.send(msg).unwrap();
         Ok(())
     }
-    async fn block_gossip(&self) -> RpcResult<()> {
-        todo!()
+    async fn block_gossip(&self, block: BlockBytesEnvelope) -> RpcResult<()> {
+        println!("received ledger update RPC");
+        self.block_sender.send(block).unwrap();
+        Ok(())
     }
 }
 
@@ -74,7 +82,8 @@ impl Interface {
         let addr = server.local_addr().expect("failed to get local addr");
 
         let (gossip_tx, gossip_rx) = unbounded_channel();
-        let rpc_module = Server::new(gossip_tx).into_rpc().remove_context();
+        let (block_tx, _) = unbounded_channel();
+        let rpc_module = Server::new(gossip_tx, block_tx).into_rpc().remove_context();
         let server_handle = server.start(rpc_module);
         tokio::spawn(server_handle.stopped());
 
@@ -120,7 +129,7 @@ impl Interface {
         }
     }
 
-    pub async fn connect(&mut self, addr: &SocketAddr) -> Arc<HttpClient> {
+    async fn connect(&mut self, addr: &SocketAddr) -> Arc<HttpClient> {
         let client = self.clients.entry(*addr).or_insert_with(|| {
             let server_url = format!("http://{}", addr);
             Arc::new(
@@ -134,8 +143,7 @@ impl Interface {
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Eq, PartialEq, Hash)]
-pub struct SignedLedgerUpdate {
-    pub signature: SignatureBytes,
-    /// Serialized [`crate::types::LedgerUpdate`]
-    pub canonical_bytes: Vec<u8>,
+pub struct BlockBytesEnvelope {
+    /// Serialized [`crate::types::Block`]
+    bytes: Vec<u8>,
 }
