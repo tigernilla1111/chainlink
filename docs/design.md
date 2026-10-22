@@ -195,6 +195,14 @@ pub struct Comment {
 
 The state after a block is the parent's state, cloned, with the block applied (§4). Two forks that share 10,000 posts store them once, and `Bytes` lets the state share the block's buffer, so a body isn't stored twice.
 
+`seen_txs` is how replays are blocked without account records: a tx whose ID is already in it is invalid. It's part of each snapshot, so it follows the fork. If block 99 included tx T and then loses a reorg, T can go into the winning fork, because that fork's state never saw it:
+
+```mermaid
+flowchart LR
+  b98["98"] --> b99["99: includes T<br/>(loses the reorg)"]
+  b98 --> n99["99′: no T"] --> n100["100′: includes T, valid"]
+```
+
 ### Block store
 
 ```rust
@@ -382,6 +390,13 @@ On arrival a tx gets the step 6 checks before it's stored or relayed. Expired tx
 ## 8. Retention and deletes
 
 Replies and deletes can only target content whose post is within the last `R` blocks: a post created at height `p` can be replied to or deleted up to height `p + R`. So validation never needs anything older, and older content is dropped. When a state advances to height `h`, it drops the posts created in block `h − R − 1` with their whole threads, and the `seen_txs` entries from block `h − TX_TTL − 1`, by reading those blocks' txs. That's one block's worth of work, not a scan of everything stored.
+
+A `seen_txs` entry only has to outlive the tx's `valid_until_height`, since a replay after that fails the height check anyway. For example, with `TX_TTL` = 120, a tx included in block 100 is valid until 220 at most:
+
+```mermaid
+flowchart LR
+  inc["100: T included"] --> kept["101–220: a replay is<br/>rejected by seen_txs"] --> drop["221: T's entry dropped;<br/>a replay has expired"]
+```
 
 Nothing is stored on disk. A later restart cache would keep the blocks already in memory, so it won't keep anything longer. In the worst case those blocks hold about 2.6 GB ((`R` + `FINALITY_DEPTH`) × 128 KB), plus per-item overhead in the state maps; measure it in Phase 1.
 
