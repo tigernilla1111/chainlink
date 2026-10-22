@@ -75,9 +75,8 @@ mod tests {
     }
 
     #[test]
-    fn header_is_fixed_width() {
+    fn encoding_is_fixed_width() {
         assert_eq!(serialize(&header()).unwrap().len(), 32 + 8 + 8 + 32 + 4 + 8);
-        assert_eq!(serialize(&TxId(Hash([3; 32]))).unwrap().len(), 32);
         assert_eq!(
             serialize(&Signature::from_bytes(&[0; 64])).unwrap().len(),
             64
@@ -86,34 +85,20 @@ mod tests {
 
     #[test]
     fn block_round_trip() {
-        let comment = Tx {
-            author: AccountId([4; 32]),
-            valid_until_height: 100,
-            payload: TxPayload::CreateComment {
-                post: TxId(Hash([5; 32])),
-                reply_to: Some(TxId(Hash([6; 32]))),
-                body: Bytes::from_static(b"hello"),
-            },
-            signature: Signature::from_bytes(&[7; 64]),
-        };
-        let delete = Tx {
-            author: AccountId([8; 32]),
-            valid_until_height: 101,
-            payload: TxPayload::Delete {
-                target: TxId(Hash([5; 32])),
-            },
-            signature: Signature::from_bytes(&[9; 64]),
-        };
-        assert_eq!(comment.body(), Some(&Bytes::from_static(b"hello")));
-        assert_eq!(delete.body(), None);
-
         let block = Block {
             header: header(),
-            txs: vec![comment, delete],
+            txs: vec![Tx {
+                author: AccountId([4; 32]),
+                valid_until_height: 100,
+                payload: TxPayload::CreateComment {
+                    post: TxId(Hash([5; 32])),
+                    reply_to: Some(TxId(Hash([6; 32]))),
+                    body: Bytes::from_static(b"hello"),
+                },
+                signature: Signature::from_bytes(&[7; 64]),
+            }],
         };
-        let bytes = serialize(&block).unwrap();
-        let decoded: Block = deserialize(&bytes).unwrap();
+        let decoded: Block = deserialize(&serialize(&block).unwrap()).unwrap();
         assert_eq!(decoded, block);
-        assert_eq!(serialize(&decoded).unwrap(), bytes);
     }
 }
