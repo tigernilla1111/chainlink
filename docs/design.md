@@ -33,7 +33,7 @@ Protocol constants, which every node must agree on:
 |---|---|---|
 | Difficulty | Fixed | No retargeting yet, so the real block interval drifts with hashrate |
 | Block interval | 30 s | Expected time between blocks at the fixed difficulty |
-| `MAX_BLOCK_BYTES` | 128 KB | Largest serialized block |
+| `MAX_BLOCK_BYTES` | 128 KB (131,072 bytes) | Largest serialized block |
 | `MAX_BODY_BYTES` | 1,024 bytes, provisional | Largest post or comment body, in UTF-8 bytes ([decisions](decisions.md#open)) |
 | `R` | 20,160 blocks (7 days) | How long a post and its thread live |
 | `TX_TTL` | 120 blocks (1 h), provisional | Longest a tx stays valid |
@@ -158,7 +158,7 @@ pub struct BlockNode {
 
 A block's work is `2^256 / (target + 1)`, computed as `!target / (target + 1) + 1` so it fits in U256. Fork choice only looks at `total_work`.
 
-Everything that gets hashed or signed is serialized with bincode 2 (little-endian, fixed-width ints, a size limit, no trailing bytes). Signed bytes start with the genesis block's ID, so a tx can't be replayed on another network. Nodes keep the decoded tx, not its bytes: IDs, signatures and the merkle root are all computed by re-serializing it, so the bytes it arrived in don't matter.
+Everything that gets hashed or signed is serialized with bincode 2 (little-endian, fixed-width ints, at most `MAX_BLOCK_BYTES`, no trailing bytes). Signed bytes start with the genesis block's ID, so a tx can't be replayed on another network. Nodes keep the decoded tx, not its bytes: IDs, signatures and the merkle root are all computed by re-serializing it, so the bytes it arrived in don't matter.
 
 ### State
 

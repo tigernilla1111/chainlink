@@ -4,6 +4,9 @@ Newest first. Add an entry in the PR that makes the decision. To reverse one, ad
 
 ## Decided
 
+**2026-10-22: `MAX_BLOCK_BYTES` is 131,072 bytes, checked when encoding as well as decoding.**
+128 KB means 128 × 1024, like the 1,024-byte body cap. A block is the largest thing the codec handles, so it rejects anything bigger. bincode only checks its limit when decoding, so `serialize` checks too, and a node can't produce bytes its peers would reject.
+
 **2026-03-25: `min_conf` picks which snapshot a read sees.**
 A read with `min_conf = k` sees the best chain's state `k − 1` blocks below the tip. Posts, comments and deletes all follow that one rule, and nothing extra is stored per item. `k` is at most `FINALITY_DEPTH + 1`, since snapshots stop at the horizon. Refines the 2026-01 confirmation-depth entry below: depth is still computed when reading, but a read picks a snapshot instead of checking each item.
 
