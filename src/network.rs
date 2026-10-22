@@ -7,14 +7,13 @@ use jsonrpsee::core::{RpcResult, async_trait};
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use jsonrpsee::proc_macros::rpc;
 use jsonrpsee::server::ServerBuilder;
-use sha2::digest::block_buffer::Block;
 use tokio::net::ToSocketAddrs;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::{
     UnboundedReceiver as Receiver, UnboundedSender as Sender, unbounded_channel,
 };
 
-use crate::chain::types::{SignatureBytes, SignedLedgerUpdate};
+use crate::chain::block::Tx;
 
 const RPC_REQUEST_TIMEOUT_SECS: u64 = 5;
 
@@ -24,21 +23,18 @@ type PubKey = String;
 pub trait MyRpc {
     #[method(name = "ping")]
     async fn ping(&self) -> RpcResult<()>;
-    #[method(name = "gossip")]
-    async fn ledger_update_gossip(&self, msg: SignedLedgerUpdate) -> RpcResult<()>;
+    #[method(name = "tx_gossip")]
+    async fn tx_gossip(&self, msg: Tx) -> RpcResult<()>;
     #[method(name = "block_gossip")]
     async fn block_gossip(&self, block: BlockBytesEnvelope) -> RpcResult<()>;
 }
 
 struct Server {
-    update_sender: Sender<SignedLedgerUpdate>,
+    update_sender: Sender<Tx>,
     block_sender: Sender<BlockBytesEnvelope>,
 }
 impl Server {
-    fn new(
-        update_sender: Sender<SignedLedgerUpdate>,
-        block_sender: Sender<BlockBytesEnvelope>,
-    ) -> Self {
+    fn new(update_sender: Sender<Tx>, block_sender: Sender<BlockBytesEnvelope>) -> Self {
         Self {
             update_sender,
             block_sender,
@@ -51,7 +47,7 @@ impl MyRpcServer for Server {
         println!("got ping");
         Ok(())
     }
-    async fn ledger_update_gossip(&self, msg: SignedLedgerUpdate) -> RpcResult<()> {
+    async fn tx_gossip(&self, msg: Tx) -> RpcResult<()> {
         println!("received ledger update RPC");
         self.update_sender.send(msg).unwrap();
         Ok(())
@@ -65,7 +61,7 @@ impl MyRpcServer for Server {
 
 pub struct Interface {
     addr: SocketAddr,
-    gossip_rx: Option<Receiver<SignedLedgerUpdate>>,
+    gossip_rx: Option<Receiver<Tx>>,
     // TODO: move mutable structs into a State protocol
     // Define a lock order on these structs to prevent dead locks
     clients: HashMap<SocketAddr, Arc<HttpClient>>,
@@ -94,13 +90,13 @@ impl Interface {
             addr_book: HashMap::new(),
         }
     }
-    pub fn subscribe_to_gossips(&mut self) -> Option<Receiver<SignedLedgerUpdate>> {
+    pub fn subscribe_to_gossips(&mut self) -> Option<Receiver<Tx>> {
         self.gossip_rx.take()
     }
     pub async fn add_addr(&mut self, pubkey: PubKey, addr: SocketAddr) {
         self.addr_book.insert(pubkey, addr);
     }
-    pub async fn send_gossip(&mut self, rcvr: &PubKey, msg_data: &SignedLedgerUpdate) {
+    pub async fn send_gossip(&mut self, rcvr: &PubKey, msg_data: &Tx) {
         let Some(&rcvr_addr) = self.addr_book.get(rcvr) else {
             eprintln!("recipient address {rcvr} not found in address book, skipping send");
             return;
@@ -110,7 +106,7 @@ impl Interface {
 
         match tokio::time::timeout(
             Duration::from_secs(RPC_REQUEST_TIMEOUT_SECS),
-            client.ledger_update_gossip(msg_data.clone()),
+            client.tx_gossip(msg_data.clone()),
         )
         .await
         {
@@ -144,6 +140,6 @@ impl Interface {
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Eq, PartialEq, Hash)]
 pub struct BlockBytesEnvelope {
-    /// Serialized [`crate::types::Block`]
+    /// Serialized [`crate::chain::block::Block`]
     bytes: Vec<u8>,
 }

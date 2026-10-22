@@ -158,7 +158,7 @@ pub struct BlockNode {
 
 A block's work is `2^256 / (target + 1)`, computed as `!target / (target + 1) + 1` so it fits in U256. Fork choice only looks at `total_work`.
 
-Everything that gets hashed or signed is serialized with bincode 2 (little-endian, fixed-width ints, a size limit, no trailing bytes). Signed bytes start with the genesis block's ID, so a tx can't be replayed on another network, and they're kept exactly as signed.
+Everything that gets hashed or signed is serialized with bincode 2 (little-endian, fixed-width ints, a size limit, no trailing bytes). Signed bytes start with the genesis block's ID, so a tx can't be replayed on another network. Nodes keep the decoded tx, not its bytes: IDs, signatures and the merkle root are all computed by re-serializing it, so the bytes it arrived in don't matter.
 
 ### State
 
