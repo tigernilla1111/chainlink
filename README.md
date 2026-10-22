@@ -1,0 +1,69 @@
+# socialchain
+
+A proof-of-work blockchain for short social posts and comments. Nodes gossip transactions and blocks, follow the chain with the most work, and expose the current posts and threads to an app.
+
+Content is ephemeral: nodes drop each post, with its whole thread, `R` blocks (7 days) after it was posted. Anyone can still copy what they see while it's live. There are no coins, fees, or media.
+
+- [docs/design.md](docs/design.md): how it works
+- [docs/decisions.md](docs/decisions.md): what was decided and why
+
+If the code and the docs disagree, fix whichever is wrong in the same PR.
+
+## Run
+
+```bash
+cargo run
+```
+
+Starts a single node on a random local port. Right now the prototype in `src/` doesn't build; Phase 0 replaces it.
+
+## Roadmap
+
+One branch and PR per item. Tick it when it merges.
+
+**Phase 0: match the repo to the design**
+
+- [x] Design docs
+- [ ] Create the `chain` module (no networking or disk access)
+- [ ] Replace `types.rs`, and the placeholder `State` and `MemPool` in `main.rs`, with the types in [design §3](docs/design.md#3-data)
+- [ ] Switch to SHA-256 and plain Ed25519 with strict verification
+
+**Phase 1: chain library**
+
+- [ ] Block store: insert blocks, track tips, total work, fork point. Test: in a random tree, `tips` is exactly the childless blocks, and the fork point of any two blocks is their lowest common ancestor.
+- [ ] `ChainState` and `apply_block` on a single chain, including dropping threads past `R`. Test: each validation rule on its own, including the `R` boundary.
+- [ ] Fork choice and reorg. Test (with a small `R`): the best tip has the most work of the tips the node tracks, and its state matches a replay along the best chain.
+- [ ] Pruning. Test: a fork whose fork point is just below the horizon is dropped; one whose fork point is at the horizon survives.
+- [ ] Mempool and block building. Test: a built block always passes validation, even at the `R` and expiry boundaries, and fits in `MAX_BLOCK_BYTES`; a reorg puts disconnected txs back.
+- [ ] Read API. Test: `min_conf = 3` sees exactly the state two blocks below the tip, deletes included.
+
+**Phase 2: two nodes talking**
+
+- [ ] Two local nodes mine, gossip, post, comment, delete, and read
+- [ ] Measure fork rate and fork depth, and set `FINALITY_DEPTH` from them
+- [ ] A node that joins late syncs the last `R + FINALITY_DEPTH` blocks
+
+**Phase 3: app**
+
+- [ ] `feed` and `thread` reads
+- [ ] CLI or small client
+- [ ] Split `chain` into its own library crate, once the CLI needs it
+- [ ] Restart cache: keep the in-memory blocks on disk so a restart doesn't resync
+
+**Later, only if needed:**
+
+- Faster block propagation, if forks are common: send the header and tx IDs only, since peers already have the txs in their mempool
+- Permissioned miner set, if forks are common: fewer, known miners means fewer races ([open question 1](docs/decisions.md#open))
+- Invite-only signup, if spam calls for it ([open question 2](docs/decisions.md#open))
+- Lock-free reads, if profiling shows contention
+
+**Much later:**
+
+- Let users break fork ties: when two tips have equal work, show one post from each and mine on the block whose post the user picks. Only the tie-break changes, so most work still wins, and first-seen stays the default if the user doesn't pick in time.
+- Earn invites by mining, capped so mining power doesn't turn into social power
+
+**Not planned:** operator takedowns, keeping content past `R`, media.
+
+## Open questions
+
+See [decisions.md](docs/decisions.md#open). Settle accounts (question 4) before the `ChainState` work in Phase 1; the others don't block it.
