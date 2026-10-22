@@ -10,9 +10,10 @@ tokio = "1.48.0"
 tower = { version = "0.5.2", features = ["limit"] }
 bincode = { version = "2", features = ["serde"] }
 sha2 = "0.10.9"
-ed25519-dalek = { version = "2.2.0", features = ["rand_core", "digest"] }
+ed25519-dalek = { version = "2.2.0", features = ["rand_core", "digest", "serde"] }
 rand_core = "0.6.4"
 rand = "0.9.2"
-serde_bytes = "0.11.19"
 thiserror = "2.0.17"
 tracing = "0.1.44"
+bytes = { version = "1.11.0", features = ["serde"] }
+imbl = "7.0.2"
