@@ -3,6 +3,8 @@
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
+use crate::chain::codec::serialize;
+use crate::chain::crypto::sha256;
 use crate::chain::types::{AccountId, BlockId, CommentId, Hash, PostId, Signature, TxId};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -15,6 +17,12 @@ pub struct BlockHeader {
     /// Difficulty target, fixed for now.
     pub bits: u32,
     pub nonce: u64,
+}
+
+impl BlockHeader {
+    pub fn id(&self) -> BlockId {
+        BlockId(sha256(&serialize(self).expect("a header always encodes")))
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -61,7 +69,7 @@ impl Tx {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::chain::codec::{deserialize, serialize};
+    use crate::chain::codec::deserialize;
 
     fn header() -> BlockHeader {
         BlockHeader {

@@ -26,7 +26,7 @@ One branch and PR per item. Tick it when it merges.
 - [x] Design docs
 - [x] Create the `chain` module (no networking or disk access)
 - [x] Replace `types.rs`, and the placeholder `State` and `MemPool` in `main.rs`, with the types in [design §3](docs/design.md#3-data)
-- [ ] Switch to SHA-256 and plain Ed25519 with strict verification
+- [x] Switch to SHA-256 and plain Ed25519 with strict verification
 
 **Phase 1: chain library**
 
@@ -61,6 +61,7 @@ One branch and PR per item. Tick it when it merges.
 
 - Let users break fork ties: when two tips have equal work, show one post from each and mine on the block whose post the user picks. Only the tie-break changes, so most work still wins, and first-seen stays the default if the user doesn't pick in time.
 - Earn invites by mining, capped so mining power doesn't turn into social power
+- Drop mempool replies and deletes whose post has aged out past `R`, instead of keeping them until `valid_until_height`. Block building already skips them, so this only saves mempool space.
 
 **Not planned:** operator takedowns, keeping content past `R`, media.
 
