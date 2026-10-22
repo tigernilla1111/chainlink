@@ -1,18 +1,14 @@
 use std::collections::HashSet;
 
-use crate::{
+use crate::chain::{
+    codec::{deserialize, serialize},
     crypto::{PrivateKey, verify_msg},
-    network::{Interface, SignedLedgerUpdate},
-    types::{LedgerUpdate, LedgerUpdateType},
-    util::{deserialize, serialize},
+    types::{HashBytes, LedgerUpdate, LedgerUpdateType, SignedLedgerUpdate},
 };
+use crate::network::Interface;
 
-mod crypto;
+mod chain;
 mod network;
-mod types;
-mod util;
-
-use types::HashBytes;
 
 #[tokio::main]
 async fn main() {

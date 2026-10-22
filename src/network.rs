@@ -14,7 +14,7 @@ use tokio::sync::mpsc::{
     UnboundedReceiver as Receiver, UnboundedSender as Sender, unbounded_channel,
 };
 
-use crate::types::{SignatureBytes, SignedLedgerUpdate};
+use crate::chain::types::{SignatureBytes, SignedLedgerUpdate};
 
 const RPC_REQUEST_TIMEOUT_SECS: u64 = 5;
 

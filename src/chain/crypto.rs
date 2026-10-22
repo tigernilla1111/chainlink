@@ -1,6 +1,6 @@
 use std::hash::Hash;
 
-use crate::types::{HashBytes, PublicKeyBytes, SignatureBytes};
+use crate::chain::types::{HashBytes, PublicKeyBytes, SignatureBytes};
 use ed25519_dalek::Verifier;
 use ed25519_dalek::ed25519::signature::Signer;
 use rand_core::OsRng;

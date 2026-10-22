@@ -15,7 +15,7 @@ If the code and the docs disagree, fix whichever is wrong in the same PR.
 cargo run
 ```
 
-Starts a single node on a random local port. Right now the prototype in `src/` doesn't build; Phase 0 replaces it.
+Starts a single node on a random local port. The prototype in `src/` is being replaced by Phase 0.
 
 ## Roadmap
 
@@ -24,7 +24,7 @@ One branch and PR per item. Tick it when it merges.
 **Phase 0: match the repo to the design**
 
 - [x] Design docs
-- [ ] Create the `chain` module (no networking or disk access)
+- [x] Create the `chain` module (no networking or disk access)
 - [ ] Replace `types.rs`, and the placeholder `State` and `MemPool` in `main.rs`, with the types in [design §3](docs/design.md#3-data)
 - [ ] Switch to SHA-256 and plain Ed25519 with strict verification
 
