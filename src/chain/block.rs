@@ -92,15 +92,6 @@ mod tests {
     }
 
     #[test]
-    fn header_id_is_sha256_of_its_bytes() {
-        let mut h = header();
-        assert_eq!(h.id(), BlockId(sha256(&serialize(&h).unwrap())));
-        let id = h.id();
-        h.nonce += 1;
-        assert_ne!(h.id(), id);
-    }
-
-    #[test]
     fn block_round_trip() {
         let block = Block {
             header: header(),

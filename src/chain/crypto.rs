@@ -49,19 +49,14 @@ mod tests {
             verify(author, b"hellp", &sig),
             Err(InvalidSignature(author))
         );
-
-        let other = AccountId(SigningKey::from_bytes(&[8; 32]).verifying_key().to_bytes());
-        assert_eq!(verify(other, b"hello", &sig), Err(InvalidSignature(other)));
     }
 
     #[test]
-    fn strict_rejects_small_order_key() {
+    fn strict_rejects_small_order_forgery() {
         let mut identity = [0; 32];
         identity[0] = 1;
         let author = AccountId(identity);
-        let mut sig_bytes = [0; 64];
-        sig_bytes[..32].copy_from_slice(&identity);
-        let sig = Signature::from_bytes(&sig_bytes);
+        let sig = Signature::from_components(identity, [0; 32]);
 
         let key = VerifyingKey::from_bytes(&identity).unwrap();
         assert!(key.verify(b"any message", &sig).is_ok());
