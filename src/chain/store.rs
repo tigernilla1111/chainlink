@@ -13,8 +13,7 @@ use crate::chain::types::BlockId;
 pub struct BlockNode {
     pub id: BlockId,
     pub block: Arc<Block>,
-    /// Parent's `total_work` + this block's work. Saturates; only reachable with bits that
-    /// validation step 2 rejects.
+    /// Parent's `total_work` + this block's work.
     pub total_work: U256,
     pub children: SmallVec<[BlockId; 2]>,
 }
@@ -27,8 +26,6 @@ pub enum StoreError {
     UnknownParent(BlockId),
     #[error("height {height} is not the parent's {parent} + 1")]
     BadHeight { height: u64, parent: u64 },
-    #[error("bits {0:#010x} don't decode to a target")]
-    BadBits(u32),
 }
 
 pub struct BlockStore {
@@ -38,20 +35,20 @@ pub struct BlockStore {
 
 impl BlockStore {
     /// Roots the tree at `genesis`, whose total work is its own work.
-    pub fn new(genesis: Arc<Block>) -> Result<Self, StoreError> {
+    pub fn new(genesis: Arc<Block>) -> Self {
         let header = &genesis.header;
         let id = header.id();
-        let work = header.work().ok_or(StoreError::BadBits(header.bits))?;
+        let total_work = header.work();
         let node = BlockNode {
             id,
             block: genesis,
-            total_work: work,
+            total_work,
             children: SmallVec::new(),
         };
-        Ok(Self {
+        Self {
             nodes: HashMap::from([(id, node)]),
             tips: HashSet::from([id]),
-        })
+        }
     }
 
     /// Adds a block under its stored parent, which stops being a tip. A failed insert changes nothing.
@@ -61,7 +58,6 @@ impl BlockStore {
         if self.nodes.contains_key(&id) {
             return Err(StoreError::Duplicate(id));
         }
-        let work = header.work().ok_or(StoreError::BadBits(header.bits))?;
         let parent = self
             .nodes
             .get_mut(&header.parent)
@@ -73,7 +69,7 @@ impl BlockStore {
                 parent: parent_height,
             });
         }
-        let total_work = parent.total_work.saturating_add(work);
+        let total_work = parent.total_work + header.work();
         parent.children.push(id);
         self.tips.remove(&header.parent);
         self.tips.insert(id);
@@ -117,6 +113,8 @@ impl BlockStore {
 
 #[cfg(test)]
 mod tests {
+    use std::num::NonZeroU64;
+
     use super::*;
     use crate::chain::block::BlockHeader;
     use crate::chain::types::Hash;
@@ -124,25 +122,17 @@ mod tests {
     use rand::seq::IndexedRandom;
     use rand::{Rng, SeedableRng};
 
-    const EASY: u32 = 0x1d00ffff;
-    const HARD: u32 = 0x1c00ffff;
+    const EASY: NonZeroU64 = NonZeroU64::new(1).unwrap();
+    const HARD: NonZeroU64 = NonZeroU64::new(256).unwrap();
 
-    fn work_of(bits: u32) -> U256 {
-        match bits {
-            EASY => U256::from(0x1_0001_0001u64),
-            HARD => U256::from(0x100_0100_0100u64),
-            _ => unreachable!(),
-        }
-    }
-
-    fn block(parent: BlockId, height: u64, bits: u32, nonce: u64) -> Arc<Block> {
+    fn block(parent: BlockId, height: u64, difficulty: NonZeroU64, nonce: u64) -> Arc<Block> {
         Arc::new(Block {
             header: BlockHeader {
                 parent,
                 height,
                 timestamp: 0,
                 tx_root: Hash([0; 32]),
-                bits,
+                difficulty,
                 nonce,
             },
             txs: vec![],
@@ -161,7 +151,7 @@ mod tests {
         mut check: impl FnMut(&BlockStore, &HashMap<BlockId, BlockId>),
     ) -> (BlockStore, HashMap<BlockId, BlockId>) {
         let mut rng = StdRng::seed_from_u64(seed);
-        let mut store = BlockStore::new(genesis()).unwrap();
+        let mut store = BlockStore::new(genesis());
         let mut ids = vec![genesis().header.id()];
         let mut parents = HashMap::new();
         check(&store, &parents);
@@ -171,9 +161,11 @@ mod tests {
             } else {
                 *ids.choose(&mut rng).unwrap()
             };
-            let bits = if rng.random_bool(0.5) { EASY } else { HARD };
+            let difficulty = if rng.random_bool(0.5) { EASY } else { HARD };
             let height = store.get(parent).unwrap().block.header.height + 1;
-            let id = store.insert(block(parent, height, bits, nonce)).unwrap();
+            let id = store
+                .insert(block(parent, height, difficulty, nonce))
+                .unwrap();
             parents.insert(id, parent);
             ids.push(id);
             check(&store, &parents);
@@ -247,7 +239,7 @@ mod tests {
             for id in all_ids(&parents) {
                 let sum = ancestors(&parents, id)
                     .into_iter()
-                    .map(|a| work_of(store.get(a).unwrap().block.header.bits))
+                    .map(|a| U256::from(store.get(a).unwrap().block.header.difficulty.get()))
                     .fold(U256::zero(), |a, w| a + w);
                 assert_eq!(store.get(id).unwrap().total_work, sum);
             }
@@ -257,7 +249,7 @@ mod tests {
     #[test]
     fn bad_inserts_are_errors_and_change_nothing() {
         let g = genesis().header.id();
-        let mut store = BlockStore::new(genesis()).unwrap();
+        let mut store = BlockStore::new(genesis());
         let a = store.insert(block(g, 1, EASY, 1)).unwrap();
         let unknown = BlockId(Hash([9; 32]));
         let bad = [
@@ -280,11 +272,6 @@ mod tests {
                     parent: 0,
                 },
             ),
-            (block(a, 2, 0x1d000000, 5), StoreError::BadBits(0x1d000000)),
-            (
-                block(unknown, 1, 0x1d000000, 6),
-                StoreError::BadBits(0x1d000000),
-            ),
             (genesis(), StoreError::Duplicate(g)),
         ];
         for (block, err) in bad {
@@ -300,21 +287,7 @@ mod tests {
             assert_eq!(store.get(id).is_some(), stored);
         }
 
-        assert_eq!(
-            BlockStore::new(block(g, 0, 0x1d000000, 0)).err(),
-            Some(StoreError::BadBits(0x1d000000))
-        );
         assert_eq!(store.find_fork_point(unknown, a), None);
         assert_eq!(store.find_fork_point(a, unknown), None);
-    }
-
-    #[test]
-    fn total_work_saturates() {
-        // Target 1, so each block's work is 2^255.
-        let g = block(BlockId(Hash([0; 32])), 0, 0x01010000, 0);
-        let g_id = g.header.id();
-        let mut store = BlockStore::new(g).unwrap();
-        let child = store.insert(block(g_id, 1, 0x01010000, 1)).unwrap();
-        assert_eq!(store.get(child).unwrap().total_work, U256::MAX);
     }
 }

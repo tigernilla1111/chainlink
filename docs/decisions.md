@@ -4,8 +4,12 @@ Newest first. Add an entry in the PR that makes the decision. To reverse one, ad
 
 ## Decided
 
+**2026-10-23: The header carries a plain `difficulty: NonZeroU64` instead of compact `bits`, and `total_work` no longer saturates.**
+Reverses the encoding and saturation parts of the `bits` entry below; the store still derives work from the header. A plain number needs no decoder and has none of compact bits' edge cases: no sign bit, no overflow, no non-canonical encodings, and zero can't be represented, so `work()` can't fail and the store has no bad-bits error. Work is the field itself, so `total_work` is a plain sum, and summing u64 work can't overflow a U256 short of 2^192 blocks, so it no longer saturates. A future per-block retarget rule can output a difficulty directly instead of rounding it to a 23-bit mantissa. The hash is read big-endian, so each 16× increase in difficulty requires about one more leading zero in its hex ID. The header grows from 92 to 96 bytes and still hashes in two SHA-256 blocks; a full 32-byte target would need a third. The cost: difficulty caps at 2^64 − 1 expected hashes per block, about 600 PH/s at 30 s blocks, far beyond what this chain will see.
+
 **2026-10-23: `bits` is Bitcoin's compact target encoding, and the store computes work from it.**
 Known values, such as Bitcoin's difficulty-1 `0x1d00ffff`, check the decoder. The store derives `total_work` from the header itself, so nothing outside it can hand it a wrong value, and a block whose `bits` don't decode to a target is rejected. `total_work` saturates instead of overflowing; only `bits` that step 2 rejects can get there.
+
 **2026-10-23: `posts`, `comments` and `threads` are `OrdMap`s, and a thread is a range of keys.**
 Measured with 5M random 32-byte keys: imbl's `HashMap` takes 173 B per entry, its `OrdMap` 65, std's `HashMap` 69. Lookups are slower (about 0.7 µs instead of 0.25), still small next to a signature check. A `Vector` of IDs allocates about 2 KB once it holds two, so `threads` keys each comment by `(post, position)` instead of keeping a `Vector` per post. With these types, folding finalized blocks into a plain mutable state would save almost no memory, so the state stays one snapshot per block.
 
