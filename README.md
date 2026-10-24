@@ -47,8 +47,10 @@ One branch and PR per item. Tick it when it merges.
 **Phase 3: app**
 
 - [ ] `feed` and `thread` reads
-- [ ] CLI or small client
-- [ ] Split `chain` into its own library crate, once the CLI needs it
+- [ ] Investigate the best way to do a UI and the client API it uses. Current idea: the node serves a web UI that signs txs through a WASM build of `chain`, over JSON-RPC. Compare it with the alternatives, including REST or another transport instead of JSON-RPC.
+- [ ] Investigate the security implications of the chosen API: abuse and resource exhaustion from public callers, requests from other sites in a browser, and which methods (mining, peers) must stay local-only
+- [ ] CLI or small client. Make it a client of the node's API, not a caller of node internals, and have it sign txs itself so the node never holds user keys. Add a fixed-port option to the node. Then a web UI can come later as a second client of the same API.
+- [ ] Split `chain` into its own library crate, once the CLI needs it. Keep it buildable for `wasm32` (no tokio, disk or OS randomness), checked in CI, so a web UI can sign txs with it.
 - [ ] Restart cache: keep the in-memory blocks on disk so a restart doesn't resync
 
 **Later, only if needed:**
