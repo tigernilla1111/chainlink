@@ -165,15 +165,15 @@ Everything that gets hashed or signed is serialized with bincode 2 (little-endia
 **Accounts are open question 4** ([decisions](decisions.md#open)). This section follows the lean: the chain keeps no account records, the key is the identity, and `seen_txs` with `TX_TTL` blocks replays, so nothing outlives `R`.
 
 ```rust
-use imbl::{HashMap, HashSet, Vector};
+use imbl::{HashSet, OrdMap};
 
 #[derive(Clone)]   // cheap: shares structure with the original
 pub struct ChainState {
     pub height:   u64,
-    pub posts:    HashMap<PostId, Arc<Post>>,
-    pub comments: HashMap<CommentId, Arc<Comment>>,
-    pub threads:  HashMap<PostId, Vector<CommentId>>,   // in posting order
-    pub seen_txs: HashSet<TxId>,                        // txs that haven't expired yet
+    pub posts:    OrdMap<PostId, Arc<Post>>,
+    pub comments: OrdMap<CommentId, Arc<Comment>>,
+    pub threads:  OrdMap<(PostId, u32), CommentId>,   // (post, position in its thread)
+    pub seen_txs: HashSet<TxId>,                      // txs that haven't expired yet
 }
 
 pub struct Post {
@@ -194,6 +194,8 @@ pub struct Comment {
 ```
 
 The state after a block is the parent's state, cloned, with the block applied (§4). Two forks that share 10,000 posts store them once, and `Bytes` lets the state share the block's buffer, so a body isn't stored twice.
+
+`threads` keys each comment by its post and its position in the thread, starting at 0. A post's comments are one range of keys, in posting order, and a new comment takes the position after the last. `posts`, `comments` and `threads` are `OrdMap`s because imbl's `HashMap` and `Vector` take far more memory at this size ([decisions](decisions.md#decided)).
 
 `seen_txs` is how replays are blocked without account records: a tx whose ID is already in it is invalid. It's part of each snapshot, so it follows the fork. If block 99 included tx T and then loses a reorg, T can go into the winning fork, because that fork's state never saw it:
 

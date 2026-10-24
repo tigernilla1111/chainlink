@@ -4,6 +4,9 @@ Newest first. Add an entry in the PR that makes the decision. To reverse one, ad
 
 ## Decided
 
+**2026-10-23: `posts`, `comments` and `threads` are `OrdMap`s, and a thread is a range of keys.**
+Measured with 5M random 32-byte keys: imbl's `HashMap` takes 173 B per entry, its `OrdMap` 65, std's `HashMap` 69. Lookups are slower (about 0.7 µs instead of 0.25), still small next to a signature check. A `Vector` of IDs allocates about 2 KB once it holds two, so `threads` keys each comment by `(post, position)` instead of keeping a `Vector` per post. With these types, folding finalized blocks into a plain mutable state would save almost no memory, so the state stays one snapshot per block.
+
 **2026-10-22: `MAX_BLOCK_BYTES` is 131,072 bytes, checked when encoding as well as decoding.**
 128 KB means 128 × 1024, like the 1,024-byte body cap. A block is the largest thing the codec handles, so it rejects anything bigger. bincode only checks its limit when decoding, so `serialize` checks too, and a node can't produce bytes its peers would reject.
 

@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 /// A SHA-256 digest.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Hash(pub [u8; 32]);
 
 /// SHA-256 of the serialized header.
@@ -11,7 +11,7 @@ pub struct Hash(pub [u8; 32]);
 pub struct BlockId(pub Hash);
 
 /// SHA-256 of the bytes the author signed.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct TxId(pub Hash);
 
 /// The `TxId` of the tx that created the post or comment.
