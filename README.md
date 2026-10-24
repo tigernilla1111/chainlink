@@ -27,6 +27,7 @@ One branch and PR per item. Tick it when it merges.
 - [x] Create the `chain` module (no networking or disk access)
 - [x] Replace `types.rs`, and the placeholder `State` and `MemPool` in `main.rs`, with the types in [design §3](docs/design.md#3-data)
 - [x] Switch to SHA-256 and plain Ed25519 with strict verification
+- [x] Cap encoding and decoding at `MAX_BLOCK_BYTES`, so a full-size block round-trips
 
 **Phase 1: chain library**
 
