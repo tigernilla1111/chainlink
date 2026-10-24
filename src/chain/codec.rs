@@ -39,6 +39,8 @@ pub fn deserialize<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T, De
 
 #[cfg(test)]
 mod tests {
+    use std::num::NonZeroU64;
+
     use bytes::Bytes;
 
     use super::*;
@@ -51,7 +53,7 @@ mod tests {
             height: 7,
             timestamp: 1_700_000_000,
             tx_root: Hash([2; 32]),
-            bits: 0x1d00ffff,
+            difficulty: NonZeroU64::new(1).unwrap(),
             nonce: 42,
         }
     }
@@ -111,7 +113,7 @@ mod tests {
             .collect();
         assert_eq!(
             hex,
-            "cf42a7aec4109458258b62058db2b001cfb6a48631d11e08584464a3110c01bb"
+            "39bacd5c49c0d609e17ced202e055adcefad954bef95e97c9e365784141de7fd"
         );
     }
 }

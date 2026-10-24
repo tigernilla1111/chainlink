@@ -116,12 +116,12 @@ All IDs are 32 bytes.
 
 ```rust
 pub struct BlockHeader {
-    pub parent:    BlockId,
-    pub height:    u64,
-    pub timestamp: u64,
-    pub tx_root:   Hash,   // merkle root over txs, bodies included
-    pub bits:      u32,    // difficulty target, fixed for now
-    pub nonce:     u64,
+    pub parent:     BlockId,
+    pub height:     u64,
+    pub timestamp:  u64,
+    pub tx_root:    Hash,         // merkle root over txs, bodies included
+    pub difficulty: NonZeroU64,   // fixed for now
+    pub nonce:      u64,
 }
 
 pub struct Block {
@@ -156,7 +156,7 @@ pub struct BlockNode {
 }
 ```
 
-A block's work is `2^256 / (target + 1)`, computed as `!target / (target + 1) + 1` so it fits in U256. Fork choice only looks at `total_work`. `bits` is Bitcoin's compact target encoding: the top byte is a size, bit 23 a sign bit, the low 23 bits a mantissa, `target = mantissa × 256^(size − 3)`, rounded down; a zero, negative or wider-than-256-bit target is invalid.
+A block's work is its `difficulty`, and `total_work` is the plain sum along the chain. Fork choice only looks at `total_work`. A header meets its difficulty when its hash, read as a big-endian number, is at most `U256::MAX / difficulty`, rounded down. `difficulty` is a `NonZeroU64`: a header whose difficulty bytes are zero doesn't decode.
 
 Everything that gets hashed or signed is serialized with bincode 2 (little-endian, fixed-width ints, at most `MAX_BLOCK_BYTES`, no trailing bytes). Signed bytes start with the genesis block's ID, so a tx can't be replayed on another network. Nodes keep the decoded tx, not its bytes: IDs, signatures and the merkle root are all computed by re-serializing it, so the bytes it arrived in don't matter.
 
@@ -234,7 +234,7 @@ Checks run cheapest first so bad blocks are rejected early.
 | # | Check | Notes |
 |---|---|---|
 | 1 | Already seen? | Known or known-invalid → drop |
-| 2 | Header on its own | `bits` equals the fixed difficulty and the header hash meets its target, timestamp not too far ahead of the local clock, size limits |
+| 2 | Header on its own | `difficulty` equals the fixed difficulty and the header hash is at most `U256::MAX / difficulty` (§3), timestamp not too far ahead of the local clock, size limits |
 | 3 | Parent known? | No → hold as orphan |
 | 4 | Parent usable? | Invalid → mark invalid. Below the horizon → drop |
 | 5 | Header vs parent | Height is parent + 1, timestamp after the median of recent blocks |
