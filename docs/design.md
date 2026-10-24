@@ -41,7 +41,7 @@ Protocol constants, which every node must agree on:
 
 Node limits, which peers don't need to agree on: `MAX_TIPS` = 64 forks tracked at once, the mempool byte cap (§7) and the orphan caps (§4).
 
-Key crates: `imbl` (persistent maps, so snapshots share structure) and `primitive-types` (U256 work). The node adds `jsonrpsee` and `tokio`.
+Key crates: `imbl` (persistent maps, so snapshots share structure) and `primitive-types` (U256 work). The node adds `tokio`, plus a crate for its client API once Phase 3 picks one (JSON-RPC with `jsonrpsee` is the current idea).
 
 ## 2. Modules
 
