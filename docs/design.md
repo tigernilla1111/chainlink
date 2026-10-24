@@ -89,10 +89,10 @@ src/
     crypto.rs       SHA-256, Ed25519 verification
     codec.rs        canonical bincode
     block.rs        BlockHeader, Block, Tx, TxPayload
-    store.rs        BlockStore: block tree, orphans, invalid IDs
+    store.rs        BlockStore: block tree, tips, orphans, invalid IDs
     state.rs        ChainState, apply_block
     validate.rs     checks that need no state (§4 steps 2, 5, 6)
-    manager.rs      ChainManager: tips, fork choice, reorg, pruning, block building
+    manager.rs      ChainManager: fork choice, reorg, pruning, block building
     mempool.rs      pending txs
     view.rs         read API
 ```
@@ -156,7 +156,7 @@ pub struct BlockNode {
 }
 ```
 
-A block's work is `2^256 / (target + 1)`, computed as `!target / (target + 1) + 1` so it fits in U256. Fork choice only looks at `total_work`.
+A block's work is `2^256 / (target + 1)`, computed as `!target / (target + 1) + 1` so it fits in U256. Fork choice only looks at `total_work`. `bits` is Bitcoin's compact target encoding: the top byte is a size, bit 23 a sign bit, the low 23 bits a mantissa, `target = mantissa × 256^(size − 3)`, rounded down; a zero, negative or wider-than-256-bit target is invalid.
 
 Everything that gets hashed or signed is serialized with bincode 2 (little-endian, fixed-width ints, at most `MAX_BLOCK_BYTES`, no trailing bytes). Signed bytes start with the genesis block's ID, so a tx can't be replayed on another network. Nodes keep the decoded tx, not its bytes: IDs, signatures and the merkle root are all computed by re-serializing it, so the bytes it arrived in don't matter.
 
@@ -225,6 +225,8 @@ pub struct ChainManager {
 }
 ```
 
+`find_fork_point` relies on the store having a single root, the block it was created with (genesis, whose total work is its own work). Every other block is inserted under a stored parent at that parent's height + 1, so walking parents from any two stored blocks meets.
+
 ## 4. Accepting a block
 
 Checks run cheapest first so bad blocks are rejected early.
@@ -232,7 +234,7 @@ Checks run cheapest first so bad blocks are rejected early.
 | # | Check | Notes |
 |---|---|---|
 | 1 | Already seen? | Known or known-invalid → drop |
-| 2 | Header on its own | PoW meets the fixed difficulty, timestamp not too far ahead of the local clock, size limits |
+| 2 | Header on its own | `bits` equals the fixed difficulty and the header hash meets its target, timestamp not too far ahead of the local clock, size limits |
 | 3 | Parent known? | No → hold as orphan |
 | 4 | Parent usable? | Invalid → mark invalid. Below the horizon → drop |
 | 5 | Header vs parent | Height is parent + 1, timestamp after the median of recent blocks |
@@ -256,15 +258,14 @@ Only step 7 needs the parent's state.
 ## 5. Fork choice and reorg
 
 ```rust
-fn on_new_valid_block(&mut self, node: BlockNode) {
-    let id = node.id;
-    // Adds it to its parent's children, by_height and tips, and removes the parent from tips.
-    self.store.insert(node);
+fn on_new_valid_block(&mut self, block: Arc<Block>, state: ChainState) {
+    // Computes its work, adds it to its parent's children, by_height and tips, and removes the parent from tips.
+    let id = self.store.insert(block, state).expect("validated, so insert can't fail");
 
     // Switch only on strictly more work. On a tie the first one seen wins,
     // so the node doesn't flip back and forth between peers.
     if self.work(id) > self.work(self.best) {
-        let fork_point   = self.store.find_fork_point(self.best, id);
+        let fork_point   = self.store.find_fork_point(self.best, id).expect("both are stored");
         let disconnected = self.store.path_between(fork_point, self.best);   // fork point excluded
         let connected    = self.store.path_between(fork_point, id);
         self.best = id;
@@ -273,11 +274,13 @@ fn on_new_valid_block(&mut self, node: BlockNode) {
     self.prune();
 }
 
-fn find_fork_point(&self, mut a: BlockId, mut b: BlockId) -> BlockId {
-    while self.height(a) > self.height(b) { a = self.parent(a); }
-    while self.height(b) > self.height(a) { b = self.parent(b); }
-    while a != b { a = self.parent(a); b = self.parent(b); }
-    a
+// BlockStore. None if either ID isn't stored.
+fn find_fork_point(&self, mut a: BlockId, mut b: BlockId) -> Option<BlockId> {
+    let header = |id: BlockId| self.nodes.get(&id).map(|n| &n.block.header);
+    while header(a)?.height > header(b)?.height { a = header(a)?.parent; }
+    while header(b)?.height > header(a)?.height { b = header(b)?.parent; }
+    while a != b { a = header(a)?.parent; b = header(b)?.parent; }
+    Some(a)
 }
 ```
 
@@ -336,7 +339,7 @@ fn prune(&mut self) {
     // 1. Drop dead forks: fork point below the horizon.
     let dead: Vec<_> = self.store.tips.iter().copied()
         .filter(|&t| t != self.best)
-        .filter(|&t| self.height(self.store.find_fork_point(t, self.best)) < horizon)
+        .filter(|&t| self.height(self.store.find_fork_point(t, self.best).expect("both are stored")) < horizon)
         .collect();
     for tip in dead { self.store.drop_branch(tip); }
 

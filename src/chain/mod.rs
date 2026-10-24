@@ -4,6 +4,7 @@ pub mod block;
 pub mod codec;
 pub mod crypto;
 pub mod state;
+pub mod store;
 pub mod types;
 
 /// Largest serialized block: 128 KB (design §1).

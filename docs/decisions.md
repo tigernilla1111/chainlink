@@ -4,6 +4,8 @@ Newest first. Add an entry in the PR that makes the decision. To reverse one, ad
 
 ## Decided
 
+**2026-10-23: `bits` is Bitcoin's compact target encoding, and the store computes work from it.**
+Known values, such as Bitcoin's difficulty-1 `0x1d00ffff`, check the decoder. The store derives `total_work` from the header itself, so nothing outside it can hand it a wrong value, and a block whose `bits` don't decode to a target is rejected. `total_work` saturates instead of overflowing; only `bits` that step 2 rejects can get there.
 **2026-10-23: `posts`, `comments` and `threads` are `OrdMap`s, and a thread is a range of keys.**
 Measured with 5M random 32-byte keys: imbl's `HashMap` takes 173 B per entry, its `OrdMap` 65, std's `HashMap` 69. Lookups are slower (about 0.7 µs instead of 0.25), still small next to a signature check. A `Vector` of IDs allocates about 2 KB once it holds two, so `threads` keys each comment by `(post, position)` instead of keeping a `Vector` per post. With these types, folding finalized blocks into a plain mutable state would save almost no memory, so the state stays one snapshot per block.
 

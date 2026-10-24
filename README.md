@@ -31,7 +31,7 @@ One branch and PR per item. Tick it when it merges.
 
 **Phase 1: chain library**
 
-- [ ] Block store: insert blocks, track tips, total work, fork point. Test: in a random tree, `tips` is exactly the childless blocks, and the fork point of any two blocks is their lowest common ancestor.
+- [x] Block store: insert blocks, track tips, total work, fork point. Test: in a random tree, `tips` is exactly the childless blocks, and the fork point of any two blocks is their lowest common ancestor.
 - [ ] `ChainState` and `apply_block` on a single chain, including dropping threads past `R`. Test: each validation rule on its own, including the `R` boundary.
 - [ ] Fork choice and reorg. Test (with a small `R`): the best tip has the most work of the tips the node tracks, and its state matches a replay along the best chain.
 - [ ] Pruning. Test: a fork whose fork point is just below the horizon is dropped; one whose fork point is at the horizon survives.
