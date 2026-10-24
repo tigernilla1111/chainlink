@@ -4,6 +4,9 @@ Newest first. Add an entry in the PR that makes the decision. To reverse one, ad
 
 ## Decided
 
+**2026-10-23: `bits` is Bitcoin's compact target encoding, and the store computes work from it.**
+Known values, such as Bitcoin's difficulty-1 `0x1d00ffff`, check the decoder. The store derives `total_work` from the header itself, so nothing outside it can hand it a wrong value, and a block whose `bits` don't decode to a target is rejected. `total_work` saturates instead of overflowing; only `bits` that step 2 rejects can get there.
+
 **2026-10-22: `MAX_BLOCK_BYTES` is 131,072 bytes, checked when encoding as well as decoding.**
 128 KB means 128 × 1024, like the 1,024-byte body cap. A block is the largest thing the codec handles, so it rejects anything bigger. bincode only checks its limit when decoding, so `serialize` checks too, and a node can't produce bytes its peers would reject.
 

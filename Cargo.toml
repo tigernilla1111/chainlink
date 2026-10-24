@@ -16,3 +16,5 @@ thiserror = "2.0.17"
 tracing = "0.1.44"
 bytes = { version = "1.11.0", features = ["serde"] }
 imbl = "7.0.2"
+primitive-types = { version = "0.14.0", default-features = false }
+smallvec = "1.15.1"
