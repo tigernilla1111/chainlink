@@ -4,6 +4,9 @@ Newest first. Add an entry in the PR that makes the decision. To reverse one, ad
 
 ## Decided
 
+**2026-10-24: Arrival drops txs the best chain already includes.**
+Qualifies the 2026-01 lazy-mempool entry. A tx whose ID is in the best tip's `seen_txs` can't go into a block on that chain, and a reorg away from its block puts it back, so it's dropped on arrival and not relayed. Replays of included txs are free to send, since honest authors signed them, so step 6 alone let anyone make every node hold up to `TX_TTL` blocks of dead txs. Other state checks still wait for block building.
+
 **2026-10-23: The header carries a plain `difficulty: NonZeroU64` instead of compact `bits`, and `total_work` no longer saturates.**
 Reverses the encoding and saturation parts of the `bits` entry below; the store still derives work from the header. A plain number needs no decoder and has none of compact bits' edge cases: no sign bit, no overflow, no non-canonical encodings, and zero can't be represented, so `work()` can't fail and the store has no bad-bits error. Work is the field itself, so `total_work` is a plain sum, and summing u64 work can't overflow a U256 short of 2^192 blocks, so it no longer saturates. A future per-block retarget rule can output a difficulty directly instead of rounding it to a 23-bit mantissa. The hash is read big-endian, so each 16× increase in difficulty requires about one more leading zero in its hex ID. The header grows from 92 to 96 bytes and still hashes in two SHA-256 blocks; a full 32-byte target would need a third. The cost: difficulty caps at 2^64 − 1 expected hashes per block, about 600 PH/s at 30 s blocks, far beyond what this chain will see.
 

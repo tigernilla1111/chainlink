@@ -35,7 +35,7 @@ One branch and PR per item. Tick it when it merges.
 - [ ] `ChainState` and `apply_block` on a single chain, including dropping threads past `R`. Test: each validation rule on its own, including the `R` boundary.
 - [ ] Fork choice and reorg. Test (with a small `R`): the best tip has the most work of the tips the node tracks, and its state matches a replay along the best chain.
 - [ ] Pruning. Test: a fork whose fork point is just below the horizon is dropped; one whose fork point is at the horizon survives.
-- [ ] Mempool and block building. Test: a built block always passes validation, even at the `R` and expiry boundaries, and fits in `MAX_BLOCK_BYTES`; a reorg puts disconnected txs back.
+- [ ] Mempool and block building. Test: a built block always passes validation, even at the `R` and expiry boundaries, and fits in `MAX_BLOCK_BYTES`; a reorg puts disconnected txs back; under random orders of tx arrivals and blocks, including the same tx in both forks of a reorg, the mempool never holds a tx in the best tip's `seen_txs`; a tx arriving with `valid_until_height` at best + 1 or best + 1 + `TX_TTL` is kept, and one past either end is dropped.
 - [ ] Read API. Test: `min_conf = 3` sees exactly the state two blocks below the tip, deletes included.
 
 **Phase 2: two nodes talking**
