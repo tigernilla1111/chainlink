@@ -284,7 +284,7 @@ fn find_fork_point(&self, mut a: BlockId, mut b: BlockId) -> Option<BlockId> {
 }
 ```
 
-The new tip's state was already built when its block was validated, so switching is just changing `best`. Txs from disconnected blocks go back into the mempool, and txs in connected blocks leave it. A plain extension is the same call with nothing disconnected.
+The new tip's state was already built when its block was validated, so switching is just changing `best`. Txs from disconnected blocks go back into the mempool unless the new best tip's `seen_txs` has them, since the same tx can be in both forks (§3), and txs in connected blocks leave it. A plain extension is the same call with nothing disconnected.
 
 ```mermaid
 flowchart LR
@@ -298,6 +298,10 @@ flowchart LR
   fp --> o99
   fp --> n99
 ```
+
+What happens to a tx that the old best included, depending on whether the new best has it too:
+
+![A tx from a disconnected block returns to the mempool only if the new best chain lacks it](diagrams/reorg-tx-return.svg)
 
 ## 6. Pruning
 
@@ -388,9 +392,15 @@ fn build_candidate(&mut self, tip: BlockId) -> Vec<Tx> {
 }
 ```
 
-One mempool serves all forks. A tx is checked against a fork only when a block is built on it, and a failure is remembered for that tip so the next build skips it. Those entries go when the tip gets a child, so at worst a tx waits one block.
+One mempool serves all forks. Apart from the arrival checks below, a tx is checked against a fork only when a block is built on it, and a failure is remembered for that tip so the next build skips it. Those entries go when the tip gets a child, so at worst a tx waits one block.
 
-On arrival a tx gets the step 6 checks before it's stored or relayed. Expired txs are dropped, and the pool is capped in bytes.
+On arrival the manager drops a tx, without storing or relaying it, if its ID is already in the mempool, if its ID is in the best tip's `seen_txs`, or if it fails a step 6 check with the block height taken as the best tip's height + 1. The ID checks run first, so a replay costs a lookup, not a signature check. A tx in the best tip's `seen_txs` can't go into any block built on that tip: its entry outlives the tx's `valid_until_height` (§8), and a reorg away from its block puts it back from the block itself (§5). So the mempool never holds a tx that is in the best tip's `seen_txs`. The other state checks wait for `build_candidate`, since a reply's post or a delete's target may still be in the mempool.
+
+Each time the best tip changes, after `on_reorg`, txs whose `valid_until_height` is at most the new best height are dropped, since no block on it can include them. The pool is capped in bytes. An app signing against tip `t` should set `valid_until_height` to at most `t + 1 + TX_TTL − m` for a small margin `m`, so nodes up to `m` blocks behind still accept the tx.
+
+The whole life of a tx, from signing to being forgotten:
+
+![A tx is signed, checked on arrival, held in the mempool, built into a block, and forgotten after TX_TTL blocks; its post lives R blocks](diagrams/tx-life.svg)
 
 ## 8. Retention and deletes
 
@@ -452,7 +462,7 @@ impl ChainHandle {
 }
 ```
 
-One mutex for now. If reads end up waiting on validation, move to one writer task that publishes snapshots through `ArcSwap`. Signature checks can run in parallel with `rayon` either way.
+One mutex for now. If reads end up waiting on validation, move to one writer task that publishes snapshots through `ArcSwap`. Signature checks can run in parallel with `rayon` either way. If it moves to one writer, `submit_tx`'s arrival checks (§7) run in the writer, since they read the best tip's `seen_txs`.
 
 ## 11. Attacks
 
@@ -465,6 +475,7 @@ One mutex for now. If reads end up waiting on validation, move to one writer tas
 | Deep reorg | `FINALITY_DEPTH` | Now |
 | Huge posts | `MAX_BODY_BYTES` | Now |
 | Filling the mempool | Step 6 checks before relay, byte cap, `TX_TTL` expiry | Now |
+| Replaying included txs into mempools | Arrival drops txs in the best tip's `seen_txs` (§7) | Now |
 | Spam | Identity gating and/or per-tx PoW | Open question 2 |
 | Out-mining honest miners | Permissioned miners | Open question 1 |
 | Invite farming | Rate limit by block height | With invites |

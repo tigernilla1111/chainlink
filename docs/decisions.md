@@ -4,6 +4,9 @@ Newest first. Add an entry in the PR that makes the decision. To reverse one, ad
 
 ## Decided
 
+**2026-10-24: Arrival drops txs the best chain already includes.**
+Qualifies the 2026-01 lazy-mempool entry. A tx whose ID is in the best tip's `seen_txs` can't go into a block on that chain, and a reorg away from its block puts it back, so it's dropped on arrival and not relayed. Replays of included txs are free to send, since honest authors signed them, so step 6 alone let anyone make every node hold up to `TX_TTL` blocks of dead txs. Other state checks still wait for block building.
+
 **2026-10-24: Difficulty retargets every block from recent block times, built in Phase 2.**
 `R` counts blocks, so posts live 7 days only while blocks average 30 s, and on a network of a few machines one miner leaving can cut hashrate to a tenth. A per-block rule (LWMA-style, weighting recent block times) corrects that within tens of blocks; a Bitcoin-style epoch would leave the rest of a 120-block epoch at 300 s blocks, up to about 10 hours. It's built with Phase 2's mining, when real block times can tune its window; until then difficulty stays fixed. Step 5 will require each block's difficulty to equal the rule's value, and the rule relies on step 2's future limit and step 5's median-time check to bound how far miners can skew timestamps. Settles the "if that matters" in the 2026-03-01 entry below.
 
