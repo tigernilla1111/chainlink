@@ -31,7 +31,7 @@ Protocol constants, which every node must agree on:
 
 | Name | Value | Meaning |
 |---|---|---|
-| Difficulty | Fixed | No retargeting yet, so the real block interval drifts with hashrate |
+| Difficulty | Fixed | Retargets every block from Phase 2 ([decisions](decisions.md)); until then the real block interval drifts with hashrate |
 | Block interval | 30 s | Expected time between blocks at the fixed difficulty |
 | `MAX_BLOCK_BYTES` | 128 KB (131,072 bytes) | Largest serialized block |
 | `MAX_BODY_BYTES` | 1,024 bytes, provisional | Largest post or comment body, in UTF-8 bytes ([decisions](decisions.md#open)) |
