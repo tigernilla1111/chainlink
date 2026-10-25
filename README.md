@@ -41,6 +41,7 @@ One branch and PR per item. Tick it when it merges.
 **Phase 2: two nodes talking**
 
 - [ ] Two local nodes mine, gossip, post, comment, delete, and read
+- [ ] Per-block difficulty retargeting from recent block times. Test: in a simulation where hashrate jumps 10× up or down, block time is back within 10% of 30 s after one window of blocks; a block with any other difficulty is rejected.
 - [ ] Measure fork rate and fork depth, and set `FINALITY_DEPTH` from them
 - [ ] A node that joins late syncs the last `R + FINALITY_DEPTH` blocks
 
