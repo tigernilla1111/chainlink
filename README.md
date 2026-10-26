@@ -32,8 +32,9 @@ One branch and PR per item. Tick it when it merges.
 **Phase 1: chain library**
 
 - [x] Block store: insert blocks, track tips, total work, fork point. Test: in a random tree, `tips` is exactly the childless blocks, and the fork point of any two blocks is their lowest common ancestor.
-- [ ] `ChainState` and `apply_block` on a single chain, including dropping threads past `R`. Test: each validation rule on its own, including the `R` boundary.
-- [ ] Fork choice and reorg. Test (with a small `R`): the best tip has the most work of the tips the node tracks, and its state matches a replay along the best chain.
+- [x] `ChainState` and `apply_block` on a single chain, including dropping threads past `R`. Test: each validation rule on its own, including the `R` boundary.
+- [ ] `validate.rs`: the checks that need no state (design §4 steps 2, 5 and 6): PoW and size limits, the height against the parent and the timestamp against the local clock and the median of recent blocks, merkle root, tx format, body size and signatures. Test: each check on its own, including the body-size and timestamp boundaries; a known-answer vector pins the merkle root, and a tx signed for another genesis is rejected.
+- [ ] Fork choice and reorg. Test: in a random tree, the best tip has the most work of the tips the node tracks, and its state matches a replay along the best chain.
 - [ ] Pruning. Test: a fork whose fork point is just below the horizon is dropped; one whose fork point is at the horizon survives.
 - [ ] Mempool and block building. Test: a built block always passes validation, even at the `R` and expiry boundaries, and fits in `MAX_BLOCK_BYTES`; a reorg puts disconnected txs back; under random orders of tx arrivals and blocks, including the same tx in both forks of a reorg, the mempool never holds a tx in the best tip's `seen_txs`; a tx arriving with `valid_until_height` at best + 1 or best + 1 + `TX_TTL` is kept, and one past either end is dropped.
 - [ ] Read API. Test: `min_conf = 3` sees exactly the state two blocks below the tip, deletes included.
@@ -71,4 +72,4 @@ One branch and PR per item. Tick it when it merges.
 
 ## Open questions
 
-See [decisions.md](docs/decisions.md#open). Settle accounts (question 4) before the `ChainState` work in Phase 1; the others don't block it.
+See [decisions.md](docs/decisions.md#open).

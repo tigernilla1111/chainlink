@@ -38,6 +38,7 @@ Protocol constants, which every node must agree on:
 | `R` | 20,160 blocks (7 days) | How long a post and its thread live |
 | `TX_TTL` | 120 blocks (1 h), provisional | Longest a tx stays valid |
 | `FINALITY_DEPTH` | 24 blocks (12 min), provisional | Deepest reorg a node will follow |
+| Genesis block | Compiled in (`GENESIS_HEADER`) | The root of every chain, never validated; its ID starts every tx's signed bytes |
 
 Node limits, which peers don't need to agree on: `MAX_TIPS` = 64 forks tracked at once, the mempool byte cap (§7) and the orphan caps (§4).
 
@@ -91,7 +92,7 @@ src/
     block.rs        BlockHeader, Block, Tx, TxPayload
     store.rs        BlockStore: block tree, tips, orphans, invalid IDs
     state.rs        ChainState, apply_block
-    validate.rs     checks that need no state (§4 steps 2, 5, 6)
+    validate.rs     checks that need no state (§4 steps 2, 5 and 6)
     manager.rs      ChainManager: fork choice, reorg, pruning, block building
     mempool.rs      pending txs
     view.rs         read API
@@ -131,7 +132,7 @@ pub struct Block {
 
 pub struct Tx {
     pub author:             AccountId,
-    pub valid_until_height: u64,   // at most TX_TTL above the block that includes it
+    pub valid_until_height: u64,   // between the height of the block that includes it and TX_TTL above it
     pub payload:            TxPayload,
     pub signature:          Signature,
 }
@@ -143,6 +144,10 @@ pub enum TxPayload {
 }
 
 impl Tx {
+    /// SHA-256 of the signed bytes: genesis ID, author, valid_until_height, payload.
+    pub fn id(&self) -> TxId;
+    /// height ≤ valid_until_height ≤ height + TX_TTL.
+    pub fn in_window(&self, height: u64) -> bool;
     /// All body reads go through here, so bodies can move out of the tx later.
     pub fn body(&self) -> Option<&Bytes>;
 }
@@ -162,7 +167,7 @@ Everything that gets hashed or signed is serialized with bincode 2 (little-endia
 
 ### State
 
-**Accounts are open question 4** ([decisions](decisions.md#open)). This section follows the lean: the chain keeps no account records, the key is the identity, and `seen_txs` with `TX_TTL` blocks replays, so nothing outlives `R`.
+The chain keeps no account records: the key is the identity, and `seen_txs` with `TX_TTL` blocks replays, so nothing outlives `R` and a new node rebuilds everything from the blocks it gets ([decisions](decisions.md#decided)).
 
 ```rust
 use imbl::{HashSet, OrdMap};
@@ -174,6 +179,7 @@ pub struct ChainState {
     pub comments: OrdMap<CommentId, Arc<Comment>>,
     pub threads:  OrdMap<(PostId, u32), CommentId>,   // (post, position in its thread)
     pub seen_txs: HashSet<TxId>,                      // txs that haven't expired yet
+    pub blocks:   OrdMap<u64, Arc<Block>>,            // the last R + 1 blocks, by height (§8)
 }
 
 pub struct Post {
@@ -238,18 +244,18 @@ Checks run cheapest first so bad blocks are rejected early.
 | 3 | Parent known? | No → hold as orphan |
 | 4 | Parent usable? | Invalid → mark invalid. Below the horizon → drop |
 | 5 | Header vs parent | Height is parent + 1, timestamp after the median of recent blocks |
-| 6 | Txs on their own | Merkle root, format, body size, signatures (`verify_strict`), `valid_until_height` between the block's height and `TX_TTL` above it |
-| 7 | Txs against state | Applied in block order (below) |
+| 6 | Txs on their own | Merkle root, format, body size, signatures (`verify_strict`) |
+| 7 | Txs against state | Applied in block order (below), each within its height window |
 | 8 | Commit | Insert, update tips, fork choice, prune |
 
-Only step 7 needs the parent's state.
+Only step 7 needs the parent's state. It also checks each tx's height window, `height ≤ valid_until_height ≤ height + TX_TTL` (`Tx::in_window`), because that bound is what lets `seen_txs` entries expire (§8); block building gets it through `apply_tx`, and the mempool runs the same check on arrival with the best height + 1 (§7).
 
-**Applying a block.** Validation and block building share `apply_block(parent_state, height, txs)`. It first advances the state to `height`, dropping what aged out (§8), then applies the txs in order, so a tx can rely on an earlier one in the same block, like a reply to a post created just before it. Each tx must:
+**Applying a block.** Validation and block building share two steps: advancing the parent state one height, dropping what aged out (§8), then applying txs in order with `apply_tx`, so a tx can rely on an earlier one in the same block. `apply_block(parent, block)` does both for a received block, and a failing tx fails the block, naming the tx and the rule; block building skips a failing tx instead (§7). Each tx must:
 
+- be within its height window;
 - not be in `seen_txs`;
-- for a reply or delete, target a post or comment in this state that isn't deleted;
-- for a reply, have its `reply_to` (if set) in the same thread;
-- for a delete, be signed by the target's author.
+- for a reply, name a post in this state and, if `reply_to` is set, a comment in that post's thread (deleted or not);
+- for a delete, name a post or comment in this state that isn't deleted, with `author` equal to the target's author (the signature itself is step 6).
 
 **What gets remembered as invalid.** Only failures that follow from the header, or from txs that match its `tx_root`: bad PoW, a failed header-vs-parent check, or a tx breaking a rule. A body that doesn't match `tx_root` may be a peer's doing, and a timestamp ahead of the local clock may just be early, so those blocks can be tried again. `tx_root` uses a merkle tree that never duplicates a leaf, so two different tx lists can't share a root.
 
@@ -375,15 +381,14 @@ pub struct Mempool {
 }
 
 fn build_candidate(&mut self, tip: BlockId) -> Vec<Tx> {
-    let height = self.height(tip) + 1;
-    let mut state = self.state_at(tip).advanced_to(height);   // apply_block's first step
+    let mut state = self.state_at(tip).advanced();   // apply_block's first step
     let mut size = HEADER_BYTES;
     let mut out = Vec::new();
     for tx in self.mempool.iter_oldest_first() {
         if size + tx.size() > MAX_BLOCK_BYTES || self.mempool.known_invalid(tx.id(), tip) {
             continue;
         }
-        match apply_tx(&mut state, tx) {
+        match state.apply_tx(tx) {
             Ok(())  => { size += tx.size(); out.push(tx.clone()); }
             Err(_)  => self.mempool.mark_invalid(tx.id(), tip),
         }
@@ -394,7 +399,7 @@ fn build_candidate(&mut self, tip: BlockId) -> Vec<Tx> {
 
 One mempool serves all forks. Apart from the arrival checks below, a tx is checked against a fork only when a block is built on it, and a failure is remembered for that tip so the next build skips it. Those entries go when the tip gets a child, so at worst a tx waits one block.
 
-On arrival the manager drops a tx, without storing or relaying it, if its ID is already in the mempool, if its ID is in the best tip's `seen_txs`, or if it fails a step 6 check with the block height taken as the best tip's height + 1. The ID checks run first, so a replay costs a lookup, not a signature check. A tx in the best tip's `seen_txs` can't go into any block built on that tip: its entry outlives the tx's `valid_until_height` (§8), and a reorg away from its block puts it back from the block itself (§5). So the mempool never holds a tx that is in the best tip's `seen_txs`. The other state checks wait for `build_candidate`, since a reply's post or a delete's target may still be in the mempool.
+On arrival the manager drops a tx, without storing or relaying it, if its ID is already in the mempool, if its ID is in the best tip's `seen_txs`, if it fails a step 6 check, or if it is outside its height window (`in_window`) with the block height taken as the best tip's height + 1; the window's upper bound keeps a tx that never expires out of the pool. The ID checks run first, so a replay costs a lookup, not a signature check. A tx in the best tip's `seen_txs` can't go into any block built on that tip: its entry outlives the tx's `valid_until_height` (§8), and a reorg away from its block puts it back from the block itself (§5). So the mempool never holds a tx that is in the best tip's `seen_txs`. The other state checks wait for `build_candidate`, since a reply's post or a delete's target may still be in the mempool.
 
 Each time the best tip changes, after `on_reorg`, txs whose `valid_until_height` is at most the new best height are dropped, since no block on it can include them. The pool is capped in bytes. An app signing against tip `t` should set `valid_until_height` to at most `t + 1 + TX_TTL − m` for a small margin `m`, so nodes up to `m` blocks behind still accept the tx.
 
@@ -404,9 +409,9 @@ The whole life of a tx, from signing to being forgotten:
 
 ## 8. Retention and deletes
 
-Replies and deletes can only target content whose post is within the last `R` blocks: a post created at height `p` can be replied to or deleted up to height `p + R`. So validation never needs anything older, and older content is dropped. When a state advances to height `h`, it drops the posts created in block `h − R − 1` with their whole threads, and the `seen_txs` entries from block `h − TX_TTL − 1`, by reading those blocks' txs. That's one block's worth of work, not a scan of everything stored.
+Replies and deletes can only target content whose post is within the last `R` blocks: a post created at height `p` can be replied to or deleted up to height `p + R`. So validation never needs anything older, and older content is dropped. When a state advances to height `h`, it drops the posts created in block `h − R − 1` with their whole threads, and the `seen_txs` entries from block `h − TX_TTL − 1`, by reading those blocks' txs. That's one block's worth of work, not a scan of everything stored. The state keeps an `Arc<Block>` for each of its last `R + 1` heights for this; the store holds the same blocks, so the pointers cost nothing extra.
 
-A `seen_txs` entry only has to outlive the tx's `valid_until_height`, since a replay after that fails the height check anyway. For example, with `TX_TTL` = 120, a tx included in block 100 is valid until 220 at most:
+A `seen_txs` entry only has to outlive the tx's `valid_until_height`, since a replay after that falls outside its height window (§4). For example, with `TX_TTL` = 120, a tx included in block 100 is valid until 220 at most:
 
 ```mermaid
 flowchart LR
@@ -415,14 +420,14 @@ flowchart LR
 
 Nothing is stored on disk. A later restart cache would keep the blocks already in memory, so it won't keep anything longer. In the worst case those blocks hold about 2.6 GB ((`R` + `FINALITY_DEPTH`) × 128 KB), plus per-item overhead in the state maps; measure it in Phase 1.
 
-`Delete` is valid if the target is in this fork's state and not yet deleted, and the tx is signed by the target's author. It sets `deleted = true` and empties the body in the state. A deleted post or comment stays as a marker, so replies under it keep their place and one user can't wipe out other people's replies. Replying to a deleted item is invalid.
+`Delete` is valid if the target is in this fork's state and not yet deleted, and the tx is signed by the target's author. It sets `deleted = true` and empties the body in the state. A deleted post or comment stays as a marker, so replies under it keep their place and one user can't wipe out other people's replies. A reply to a deleted item is allowed: a delete hides a body, it doesn't close the thread, which stays open until its post ages out.
 
 ```mermaid
 flowchart TB
   post["Post"] --> c1["Comment"]
   post --> c2["Comment: deleted, kept as a marker"]
   c2 --> r1["Reply: stays"]
-  c2 -.-x r2["New reply: invalid"]
+  c2 --> r2["New reply: allowed"]
 ```
 
 - The body is still in the block until the block is dropped. Anyone who saw it can keep a copy; a delete only means honest nodes stop serving it.
@@ -474,7 +479,7 @@ One mutex for now. If reads end up waiting on validation, move to one writer tas
 | Many shallow forks | `MAX_TIPS` | Now |
 | Deep reorg | `FINALITY_DEPTH` | Now |
 | Huge posts | `MAX_BODY_BYTES` | Now |
-| Filling the mempool | Step 6 checks before relay, byte cap, `TX_TTL` expiry | Now |
+| Filling the mempool | Step 6 checks and the height window before relay, byte cap, `TX_TTL` expiry | Now |
 | Replaying included txs into mempools | Arrival drops txs in the best tip's `seen_txs` (§7) | Now |
 | Spam | Identity gating and/or per-tx PoW | Open question 2 |
 | Out-mining honest miners | Permissioned miners | Open question 1 |

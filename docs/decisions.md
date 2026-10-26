@@ -4,6 +4,21 @@ Newest first. Add an entry in the PR that makes the decision. To reverse one, ad
 
 ## Decided
 
+**2026-10-24: Accounts are forgotten: no account records, the key is the identity.**
+Settles open question 4 on its lean. `seen_txs` with a `TX_TTL` expiry blocks replays, so a node rebuilds everything from the blocks within `R`. Invites, if adopted, will need renewing within `R`.
+
+**2026-10-24: Replies to deleted posts and comments are allowed.**
+Reverses the "replying to it is invalid" part of the 2026-03-25 comments entry. A reply needs its post within `R` and its `reply_to`, if set, in the same thread; a delete hides a body, it doesn't close a thread. Deletes still need a live target by the same author.
+
+**2026-10-24: The state keeps an `Arc<Block>` for each of its last `R + 1` heights, and `apply_block` takes the whole block.**
+Advancing reads the expiring blocks' txs and recomputes their IDs to drop posts, threads and `seen_txs` entries; the store holds the same blocks, so the pointers cost no extra memory, and the state needs no second index of what each block created.
+
+**2026-10-24: The genesis block and its ID are compiled-in constants, and `Tx::id()` takes no argument.**
+Every node must agree on them, like `R` and `MAX_BLOCK_BYTES`, and the ID starts every tx's signed bytes. The ID is a hard-coded constant pinned by a test. `BlockStore::new` keeps taking its root block as data. The cost: a second network, such as a test net, needs its own build.
+
+**2026-10-24: `apply_tx` checks the tx height window, and the mempool uses the same check with the best height + 1.**
+The window is what makes the `seen_txs` expiry safe, so it lives beside it; block building gets it through `apply_tx`. The upper bound applies on arrival too, so a tx that never expires can't fill the pool. The cost: a tx whose `valid_until_height` is more than `TX_TTL` ahead is rejected on arrival instead of held until it fits.
+
 **2026-10-24: Arrival drops txs the best chain already includes.**
 Qualifies the 2026-01 lazy-mempool entry. A tx whose ID is in the best tip's `seen_txs` can't go into a block on that chain, and a reorg away from its block puts it back, so it's dropped on arrival and not relayed. Replays of included txs are free to send, since honest authors signed them, so step 6 alone let anyone make every node hold up to `TX_TTL` blocks of dead txs. Other state checks still wait for block building.
 
@@ -87,9 +102,10 @@ Spam is handled by identity gating and/or per-tx PoW.
 1. Open mining or a permissioned miner set. Leaning permissioned: forks would be rarer, so `FINALITY_DEPTH` and `MAX_TIPS` could be smaller. With no block rewards, open mining may draw little honest hashrate, which makes the chain cheap to out-mine.
 2. How spam is limited: identity gating, per-tx PoW, or both. Leaning toward invite-only signup, with one invite per account per period, counted in blocks rather than wall-clock time.
 3. Max post body size. Provisionally 1,024 bytes, about 1,000 characters of English text or 250 emoji. At that size a full block holds about 120 posts.
-4. Accounts: forget them after `R` like content, or keep a permanent registry. Leaning forget: the key is the identity, the chain keeps no account records, and `seen_txs` with a `TX_TTL` expiry blocks replays, so a new node can rebuild everything from the blocks it gets. Invites, if adopted, would then need renewing within `R`. The design follows the lean for now; settle this before the `ChainState` work.
+4. Settled: accounts are forgotten (2026-10-24, above).
 5. Recovering from a fork deeper than `FINALITY_DEPTH`. A split longer than 12 minutes (a partition, or a miner that kept mining offline) leaves nodes on different chains for good. Options include an operator command to switch forks, and miners pausing when they have no peers.
 6. How a new node finds the real chain without blocks back to genesis: keep every header (about 100 MB a year, no content), or ship checkpoints.
+7. How the app and network get updated, including which settings can change without restarting the network. A restart is acceptable but should be rare.
 
 ## Assumptions
 
