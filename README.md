@@ -36,12 +36,13 @@ One branch and PR per item. Tick it when it merges.
 - [ ] `validate.rs`: the checks that need no state (design §4 steps 2, 5 and 6): PoW and size limits, the height against the parent and the timestamp against the local clock and the median of recent blocks, merkle root, tx format, body size and signatures. Test: each check on its own, including the body-size and timestamp boundaries; a known-answer vector pins the merkle root, and a tx signed for another genesis is rejected.
 - [ ] Fork choice and reorg. Test: in a random tree, the best tip has the most work of the tips the node tracks, and its state matches a replay along the best chain.
 - [ ] Pruning. Test: a fork whose fork point is just below the horizon is dropped; one whose fork point is at the horizon survives.
-- [ ] Mempool and block building. Test: a built block always passes validation, even at the `R` and expiry boundaries, and fits in `MAX_BLOCK_BYTES`; a reorg puts disconnected txs back.
+- [ ] Mempool and block building. Test: a built block always passes validation, even at the `R` and expiry boundaries, and fits in `MAX_BLOCK_BYTES`; a reorg puts disconnected txs back; under random orders of tx arrivals and blocks, including the same tx in both forks of a reorg, the mempool never holds a tx in the best tip's `seen_txs`; a tx arriving with `valid_until_height` at best + 1 or best + 1 + `TX_TTL` is kept, and one past either end is dropped.
 - [ ] Read API. Test: `min_conf = 3` sees exactly the state two blocks below the tip, deletes included.
 
 **Phase 2: two nodes talking**
 
 - [ ] Two local nodes mine, gossip, post, comment, delete, and read
+- [ ] Per-block difficulty retargeting from recent block times. Test: in a simulation where hashrate jumps 10× up or down, block time is back within 10% of 30 s after one window of blocks; a block with any other difficulty is rejected.
 - [ ] Measure fork rate and fork depth, and set `FINALITY_DEPTH` from them
 - [ ] A node that joins late syncs the last `R + FINALITY_DEPTH` blocks
 

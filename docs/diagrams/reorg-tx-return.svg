@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 360" width="1080" height="360">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#57606a"/></marker></defs>
+<style>
+text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;font-size:12px;fill:#1f2328}
+.t{font-size:20px;font-weight:600}
+.s{font-size:13px;fill:#59636e}
+.h{font-size:13px;font-weight:600}
+.lbl{font-size:15px;font-weight:600}
+.m{fill:#59636e}
+.b{font-weight:600}
+.red{fill:#a40e26}
+.grn{fill:#116329}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px}
+.ln{stroke:#57606a;stroke-width:1.5;fill:none}
+.box{fill:#ffffff;stroke:#8c959f;stroke-width:1.2}
+.bad{fill:#ffebe9;stroke:#cf222e;stroke-width:1.2}
+.good{fill:#dafbe1;stroke:#1a7f37;stroke-width:1.2}
+.gray{fill:#f6f8fa;stroke:#8c959f;stroke-width:1.2}
+.panel{fill:#f6f8fa;stroke:#d0d7de;stroke-width:1}
+</style>
+<rect width="1080" height="360" fill="#ffffff"/>
+<text x="30" y="36" class="t">What happens to T when the best tip shifts</text>
+<text x="30" y="58" class="s">The node switches from tip 99 to tip 100′ because that fork has more work. Two cases for a tx T that the old best chain included.</text>
+<rect x="30" y="72" width="26" height="16" rx="3" class="" style="fill:#fff1c2;stroke:#8c959f;stroke-width:1.2"/>
+<text x="62" y="85" class="m">block that includes T</text>
+<rect x="220" y="72" width="26" height="16" rx="3" class="" style="fill:#fff;stroke:#8c959f;stroke-width:1.2;stroke-dasharray:4 3"/>
+<text x="252" y="85" class="m">old best, disconnected by the switch</text>
+<rect x="500" y="72" width="26" height="16" rx="3" class="" style="fill:#fff;stroke:#0969da;stroke-width:1.6"/>
+<text x="532" y="85" class="m">new best chain</text>
+<rect x="660" y="72" width="26" height="16" rx="3" class="" style="fill:#fff;stroke:#8c959f;stroke-width:1.2"/>
+<text x="692" y="85" class="m">block both forks share</text>
+<rect x="20" y="100" width="510" height="240" rx="10" class="panel"/>
+<text x="36" y="128" class="h">A.  T is in the old best; the new best lacks T</text>
+<rect x="40" y="185" width="52" height="30" rx="5" class="" style="fill:#ffffff;stroke:#8c959f"/>
+<text x="66" y="205" class="b" text-anchor="middle">98</text>
+<rect x="120" y="150" width="52" height="30" rx="5" class="" style="fill:#fff1c2;stroke:#8c959f;stroke-dasharray:4 3"/>
+<text x="146" y="170" class="b" text-anchor="middle">99</text>
+<text x="146" y="194" class="m" text-anchor="middle">has T</text>
+<rect x="120" y="220" width="52" height="30" rx="5" class="" style="fill:#ffffff;stroke:#0969da;stroke-width:1.6"/>
+<text x="146" y="240" class="b" text-anchor="middle">99′</text>
+<rect x="200" y="220" width="52" height="30" rx="5" class="" style="fill:#ffffff;stroke:#0969da;stroke-width:1.6"/>
+<text x="226" y="240" class="b" text-anchor="middle">100′</text>
+<path d="M92,200 L120,165" class="ln"/>
+<path d="M92,200 L120,235" class="ln"/>
+<path d="M172,235 H200" class="ln"/>
+<text x="180" y="170" class="m">old best</text>
+<text x="260" y="240" class="m">new best</text>
+<text x="360" y="162" class="m b">mempool</text>
+<rect x="360" y="170" width="64" height="28" rx="5" class="box"/>
+<text x="392" y="189" class="mono" text-anchor="middle">{ }</text>
+<path d="M426,184 H446" class="ln" marker-end="url(#a)"/>
+<rect x="450" y="170" width="64" height="28" rx="5" class="box"/>
+<text x="482" y="189" class="mono" text-anchor="middle">{T}</text>
+<text x="392" y="214" class="m" text-anchor="middle">before</text>
+<text x="482" y="214" class="m" text-anchor="middle">after</text>
+<text x="36" y="294">The switch disconnects 99. Its txs go back into the mempool,</text>
+<text x="36" y="312">so T returns and can be included on the new best chain.</text>
+<rect x="550" y="100" width="510" height="240" rx="10" class="panel"/>
+<text x="566" y="128" class="h">B.  T is in the old best; the new best has T too</text>
+<rect x="570" y="185" width="52" height="30" rx="5" class="" style="fill:#ffffff;stroke:#8c959f"/>
+<text x="596" y="205" class="b" text-anchor="middle">98</text>
+<rect x="650" y="150" width="52" height="30" rx="5" class="" style="fill:#fff1c2;stroke:#8c959f;stroke-dasharray:4 3"/>
+<text x="676" y="170" class="b" text-anchor="middle">99</text>
+<text x="676" y="194" class="m" text-anchor="middle">has T</text>
+<rect x="650" y="220" width="52" height="30" rx="5" class="" style="fill:#ffffff;stroke:#0969da;stroke-width:1.6"/>
+<text x="676" y="240" class="b" text-anchor="middle">99′</text>
+<rect x="730" y="220" width="52" height="30" rx="5" class="" style="fill:#fff1c2;stroke:#0969da;stroke-width:1.6"/>
+<text x="756" y="240" class="b" text-anchor="middle">100′</text>
+<text x="756" y="264" class="m" text-anchor="middle">has T</text>
+<path d="M622,200 L650,165" class="ln"/>
+<path d="M622,200 L650,235" class="ln"/>
+<path d="M702,235 H730" class="ln"/>
+<text x="710" y="170" class="m">old best</text>
+<text x="790" y="240" class="m">new best</text>
+<text x="890" y="162" class="m b">mempool</text>
+<rect x="890" y="170" width="64" height="28" rx="5" class="box"/>
+<text x="922" y="189" class="mono" text-anchor="middle">{ }</text>
+<path d="M956,184 H976" class="ln" marker-end="url(#a)"/>
+<rect x="980" y="170" width="64" height="28" rx="5" class="box"/>
+<text x="1012" y="189" class="mono" text-anchor="middle">{ }</text>
+<text x="922" y="214" class="m" text-anchor="middle">before</text>
+<text x="1012" y="214" class="m" text-anchor="middle">after</text>
+<text x="566" y="294" class="b">T is not re-added: 100′ already includes it.</text>
+<text x="566" y="312">A tx from a disconnected block returns only if the new best chain</text>
+<text x="566" y="330">hasn't included it, whatever order on_reorg runs its two steps in.</text>
+</svg>

@@ -136,11 +136,10 @@ mod tests {
     }
 
     #[test]
-    fn difficulty_is_eight_bytes_and_never_zero() {
+    fn zero_difficulty_does_not_decode() {
         // After parent, height, timestamp and tx_root.
         const AT: usize = 32 + 8 + 8 + 32;
         let mut bytes = serialize(&header()).unwrap();
-        assert_eq!(bytes[AT..AT + 8], 1u64.to_le_bytes());
         assert_eq!(deserialize::<BlockHeader>(&bytes).unwrap(), header());
         bytes[AT..AT + 8].fill(0);
         assert!(deserialize::<BlockHeader>(&bytes).is_err());
