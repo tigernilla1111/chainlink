@@ -73,6 +73,7 @@ flowchart TB
   mgr --> validate
   mempool --> types
   store --> types
+  store --> state
   state --> types
   validate --> types
 ```
@@ -90,7 +91,7 @@ src/
     crypto.rs       SHA-256, Ed25519 verification
     codec.rs        canonical bincode
     block.rs        BlockHeader, Block, Tx, TxPayload
-    store.rs        BlockStore: block tree, tips, orphans, invalid IDs
+    store.rs        BlockStore: block tree, per-block states, tips, orphans, invalid IDs
     state.rs        ChainState, apply_block
     validate.rs     checks that need no state (§4 steps 2, 5 and 6)
     manager.rs      ChainManager: fork choice, reorg, pruning, block building
@@ -172,7 +173,7 @@ The chain keeps no account records: the key is the identity, and `seen_txs` with
 ```rust
 use imbl::{HashSet, OrdMap};
 
-#[derive(Clone)]   // cheap: shares structure with the original
+#[derive(Clone, Debug, PartialEq, Eq)]   // clone is cheap: shares structure with the original
 pub struct ChainState {
     pub height:   u64,
     pub posts:    OrdMap<PostId, Arc<Post>>,
@@ -264,7 +265,7 @@ Only step 7 needs the parent's state. It also checks each tx's height window, `h
 ## 5. Fork choice and reorg
 
 ```rust
-fn on_new_valid_block(&mut self, block: Arc<Block>, state: ChainState) {
+fn on_new_valid_block(&mut self, block: Arc<Block>, state: ChainState) -> BlockId {
     // Computes its work, adds it to its parent's children, by_height and tips, and removes the parent from tips.
     let id = self.store.insert(block, state).expect("validated, so insert can't fail");
 
@@ -278,6 +279,7 @@ fn on_new_valid_block(&mut self, block: Arc<Block>, state: ChainState) {
         self.mempool.on_reorg(&disconnected, &connected);
     }
     self.prune();
+    id
 }
 
 // BlockStore. None if either ID isn't stored.

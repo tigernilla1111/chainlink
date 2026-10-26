@@ -11,7 +11,7 @@ use crate::chain::types::{AccountId, CommentId, PostId, TxId};
 use crate::chain::{R, TX_TTL, genesis_block};
 
 /// Cheap to clone: shares structure with the original.
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ChainState {
     pub height: u64,
     pub posts: OrdMap<PostId, Arc<Post>>,
@@ -26,7 +26,7 @@ pub struct ChainState {
     pub blocks: OrdMap<u64, Arc<Block>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Post {
     pub author: AccountId,
     pub height: u64,
@@ -35,7 +35,7 @@ pub struct Post {
     pub deleted: bool,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Comment {
     pub author: AccountId,
     pub height: u64,
