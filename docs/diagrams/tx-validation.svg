@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 862" width="1120" height="862">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#57606a"/></marker></defs>
+<style>
+text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;font-size:12px;fill:#1f2328}
+.t{font-size:20px;font-weight:600}
+.s{font-size:13px;fill:#59636e}
+.h{font-size:13px;font-weight:600}
+.m{fill:#59636e}
+.b{font-weight:600}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+.ln{stroke:#57606a;stroke-width:1.5;fill:none}
+.rule{stroke:#d0d7de;stroke-width:1}
+.box{fill:#ffffff;stroke:#8c959f;stroke-width:1.2}
+.bad{fill:#ffebe9;stroke:#cf222e;stroke-width:1.2}
+.gray{fill:#f6f8fa;stroke:#8c959f;stroke-width:1.2}
+.panel{fill:#f6f8fa;stroke:#d0d7de;stroke-width:1}
+.lbl{font-size:15px;font-weight:600}
+</style>
+<rect width="1120" height="862" fill="#ffffff"/>
+<text x="30" y="40" class="t">When a tx is checked</text>
+<text x="30" y="62" class="s">Every node checks a tx when it arrives and in each block that includes it. Miners also check it when building a block.</text>
+<text x="30" y="104" class="lbl">Which check runs when</text>
+<path d="M30,114 H1090" class="rule"/>
+<text x="540" y="138" class="h" text-anchor="middle">Arrival (§7)</text>
+<text x="540" y="155" class="m" text-anchor="middle">on every node</text>
+<text x="540" y="170" class="m" text-anchor="middle">against the best tip</text>
+<text x="740" y="138" class="h" text-anchor="middle">Building (§7)</text>
+<text x="740" y="155" class="m" text-anchor="middle">on nodes that mine</text>
+<text x="740" y="170" class="m" text-anchor="middle">against the best tip,</text>
+<text x="740" y="185" class="m" text-anchor="middle">plus earlier txs in the block</text>
+<text x="940" y="138" class="h" text-anchor="middle">Accepting (§4)</text>
+<text x="940" y="155" class="m" text-anchor="middle">on every node</text>
+<text x="940" y="170" class="m" text-anchor="middle">against the block&#x27;s parent,</text>
+<text x="940" y="185" class="m" text-anchor="middle">plus earlier txs in the block</text>
+<path d="M592,134 H688" class="ln" marker-end="url(#a)"/>
+<path d="M792,134 H888" class="ln" marker-end="url(#a)"/>
+<rect x="30" y="200" width="1060" height="24" rx="4" fill="#ddf4ff"/>
+<text x="42" y="216" class="h" style="fill:#0969da">Needs only the tx</text>
+<text x="185.8" y="216" class="m">building skips these: every tx in the mempool already passed them</text>
+<text x="42" y="242">Format, body size, signature</text>
+<circle cx="540" cy="238" r="6" fill="#0969da"/>
+<circle cx="940" cy="238" r="6" fill="#0969da"/>
+<path d="M30,252 H1090" class="rule"/>
+<text x="42" y="270">Merkle root</text>
+<circle cx="940" cy="266" r="6" fill="#0969da"/>
+<path d="M30,280 H1090" class="rule"/>
+<rect x="30" y="288" width="1060" height="24" rx="4" fill="#fff8c5"/>
+<text x="42" y="304" class="h" style="fill:#9a6700">Needs a block height</text>
+<text x="208.0" y="304" class="m">a tx that just arrived isn&#x27;t in a block yet, so arrival uses best + 1</text>
+<text x="42" y="330">Height window</text>
+<circle cx="540" cy="326" r="6" fill="#9a6700"/>
+<circle cx="740" cy="326" r="6" fill="#9a6700"/>
+<circle cx="940" cy="326" r="6" fill="#9a6700"/>
+<path d="M30,340 H1090" class="rule"/>
+<rect x="30" y="348" width="1060" height="24" rx="4" fill="#fbefff"/>
+<text x="42" y="364" class="h" style="fill:#8250df">Needs the chain state or mempool</text>
+<text x="296.8" y="364" class="m">arrival does only the ID lookups, and does them first</text>
+<text x="42" y="390">Not in mempool</text>
+<circle cx="540" cy="386" r="6" fill="#8250df"/>
+<path d="M30,400 H1090" class="rule"/>
+<text x="42" y="418">Not seen</text>
+<circle cx="540" cy="414" r="6" fill="#8250df"/>
+<circle cx="740" cy="414" r="6" fill="#8250df"/>
+<circle cx="940" cy="414" r="6" fill="#8250df"/>
+<path d="M30,428 H1090" class="rule"/>
+<text x="42" y="446">Reply target</text>
+<circle cx="540" cy="442" r="6" fill="#fff" stroke="#8250df" stroke-width="2"/>
+<text x="552" y="446" class="m">waits</text>
+<circle cx="740" cy="442" r="6" fill="#8250df"/>
+<circle cx="940" cy="442" r="6" fill="#8250df"/>
+<path d="M30,456 H1090" class="rule"/>
+<text x="42" y="474">Delete target</text>
+<circle cx="540" cy="470" r="6" fill="#fff" stroke="#8250df" stroke-width="2"/>
+<text x="552" y="474" class="m">waits</text>
+<circle cx="740" cy="470" r="6" fill="#8250df"/>
+<circle cx="940" cy="470" r="6" fill="#8250df"/>
+<path d="M30,484 H1090" class="rule"/>
+<circle cx="36" cy="500" r="5" fill="#fff" stroke="#8250df" stroke-width="2"/>
+<text x="48" y="504" class="m">waits: the target may still be in the mempool, so it&#x27;s checked once a block includes it</text>
+<text x="30" y="542" class="lbl">If a check fails</text>
+<path d="M30,552 H1090" class="rule"/>
+<rect x="464" y="566" width="152" height="62" rx="8" class="bad"/>
+<text x="540" y="586" class="h" text-anchor="middle">Dropped</text>
+<text x="540" y="604" text-anchor="middle">not stored</text>
+<text x="540" y="619" text-anchor="middle">or relayed</text>
+<rect x="664" y="566" width="152" height="62" rx="8" class="gray"/>
+<text x="740" y="586" class="h" text-anchor="middle">Skipped</text>
+<text x="740" y="604" text-anchor="middle">stays in the mempool,</text>
+<text x="740" y="619" text-anchor="middle">tried on the next tip</text>
+<rect x="864" y="566" width="152" height="62" rx="8" class="bad"/>
+<text x="940" y="586" class="h" text-anchor="middle">Block rejected</text>
+<text x="940" y="604" text-anchor="middle">and marked invalid,</text>
+<text x="940" y="619" text-anchor="middle">unless tx_root is wrong</text>
+<text x="30" y="668" class="lbl">The checks</text>
+<path d="M30,678 H1090" class="rule"/>
+<rect x="30" y="698" width="4" height="16" fill="#0969da"/>
+<text x="42" y="710" class="b">Format</text>
+<text x="142" y="710" class="m">decodes as canonical bincode</text>
+<rect x="30" y="722" width="4" height="16" fill="#0969da"/>
+<text x="42" y="734" class="b">Body size</text>
+<text x="142" y="734" class="m">body at most MAX_BODY_BYTES (1,024 bytes)</text>
+<rect x="30" y="746" width="4" height="16" fill="#0969da"/>
+<text x="42" y="758" class="b">Signature</text>
+<text x="142" y="758" class="m">verify_strict over bytes that start with the genesis ID</text>
+<rect x="30" y="770" width="4" height="16" fill="#0969da"/>
+<text x="42" y="782" class="b">Merkle root</text>
+<text x="142" y="782" class="m">the block&#x27;s txs match its tx_root</text>
+<rect x="30" y="794" width="4" height="16" fill="#9a6700"/>
+<text x="42" y="806" class="b">Height window</text>
+<text x="142" y="806" class="m">height ≤ valid_until_height ≤ height + TX_TTL</text>
+<rect x="575" y="698" width="4" height="16" fill="#8250df"/>
+<text x="587" y="710" class="b">Not in mempool</text>
+<text x="687" y="710" class="m">its ID isn&#x27;t already in the mempool</text>
+<rect x="575" y="722" width="4" height="16" fill="#8250df"/>
+<text x="587" y="734" class="b">Not seen</text>
+<text x="687" y="734" class="m">its ID isn&#x27;t in seen_txs (on arrival, the best tip&#x27;s)</text>
+<rect x="575" y="746" width="4" height="16" fill="#8250df"/>
+<text x="587" y="758" class="b">Reply target</text>
+<text x="687" y="758" class="m">post in the state (so within R); reply_to, if set, in its thread</text>
+<rect x="575" y="770" width="4" height="16" fill="#8250df"/>
+<text x="587" y="782" class="b">Delete target</text>
+<text x="687" y="782" class="m">in the state, not deleted, same author</text>
+<text x="30" y="834" class="m">Building and accepting run the same apply_tx, so a block a miner builds passes step 7.</text>
+</svg>
