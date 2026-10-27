@@ -1,7 +1,7 @@
-//! The checks that need no state (design §4 steps 2, 5 and 6). Pure functions: the caller
-//! passes the clock reading and the recent timestamps. The manager runs the steps in order,
-//! `check_header` first, since it keeps the tx encoders below from panicking on an oversize
-//! block.
+//! The checks that need no state: the header, its timestamp against the parent's chain, and the
+//! txs. Pure functions: the caller passes the clock reading and the recent timestamps. The
+//! manager runs them in order, `check_header` first, since it keeps the tx encoders below from
+//! panicking on an oversize block. See design §4, steps 2, 5 and 6.
 
 use std::num::NonZeroU64;
 
@@ -16,10 +16,10 @@ use crate::chain::{
 };
 
 /// `TimestampAhead` and `TxRootMismatch` may not be the block's fault, so the block isn't
-/// remembered as invalid (design §4).
+/// remembered as invalid. See design §4.
 #[derive(thiserror::Error, Debug, PartialEq, Eq)]
 pub enum BlockError {
-    // Step 2
+    // check_header
     #[error("difficulty {0} is not {DIFFICULTY}")]
     WrongDifficulty(NonZeroU64),
     #[error("the header hash is above the target for its difficulty")]
@@ -29,13 +29,13 @@ pub enum BlockError {
     )]
     TimestampAhead { timestamp: u64, now: u64 },
     /// Only a block built in this process can be oversize: decoding caps at `MAX_BLOCK_BYTES`.
-    /// Checked so step 6's encoders can't panic. A local bug, so there is nothing to remember.
+    /// Checked so `check_txs`'s encoders can't panic. A local bug, so there is nothing to remember.
     #[error("the block does not encode within {MAX_BLOCK_BYTES} bytes")]
     Oversize,
-    // Step 5
+    // check_parent
     #[error("timestamp {timestamp} is not after the median {median} of recent blocks")]
     TimestampNotAfterMedian { timestamp: u64, median: u64 },
-    // Step 6
+    // check_txs
     #[error("tx_root {header:?} is not the txs' merkle root {txs:?}")]
     TxRootMismatch { header: Hash, txs: Hash },
     #[error("tx {tx:?} has a {len}-byte body, outside 1..={MAX_BODY_BYTES}")]
@@ -46,15 +46,15 @@ pub enum BlockError {
     BadSignature(TxId),
 }
 
-/// Step 2 (design §4): the header on its own, and the block's size. `now` is the local clock
-/// in Unix seconds, passed in so this stays pure.
+/// Checks the header on its own, and the block's size. `now` is the local clock in Unix
+/// seconds, passed in so this stays pure. See design §4, step 2.
 pub fn check_header(block: &Block, now: u64) -> Result<(), BlockError> {
     let header = &block.header;
     if header.difficulty != DIFFICULTY {
         return Err(BlockError::WrongDifficulty(header.difficulty));
     }
-    // The hash read big-endian must be at most U256::MAX / difficulty (design §3). Before the
-    // clock check, so bad PoW is always remembered as invalid.
+    // The hash read big-endian must be at most U256::MAX / difficulty. Before the clock check,
+    // so bad PoW is always remembered as invalid. See design §3.
     let hash = U256::from_big_endian(&header.id().0.0);
     if hash > U256::MAX / header.difficulty.get() {
         return Err(BlockError::InsufficientWork);
@@ -70,10 +70,10 @@ pub fn check_header(block: &Block, now: u64) -> Result<(), BlockError> {
     Ok(())
 }
 
-/// Step 5 (design §4): the header's timestamp against its parent's chain; the store checks the
-/// height before step 7. `recent_timestamps` is the parent's timestamp, then its ancestors',
-/// newest first; only the first `MEDIAN_BLOCKS` count, and near genesis there are fewer. The
-/// median is `sorted[n / 2]`. Panics if `recent_timestamps` is empty.
+/// Checks the header's timestamp against its parent's chain; the store checks the height before
+/// `apply_block`. `recent_timestamps` is the parent's timestamp, then its ancestors', newest
+/// first; only the first `MEDIAN_BLOCKS` count, and near genesis there are fewer. The median is
+/// `sorted[n / 2]`. Panics if `recent_timestamps` is empty. See design §4, step 5.
 pub fn check_parent(header: &BlockHeader, recent_timestamps: &[u64]) -> Result<(), BlockError> {
     let mut recent: Vec<u64> = recent_timestamps
         .iter()
@@ -91,9 +91,9 @@ pub fn check_parent(header: &BlockHeader, recent_timestamps: &[u64]) -> Result<(
     Ok(())
 }
 
-/// Step 6 (design §4): the txs on their own. The merkle root first, so every later failure
-/// follows from txs the header committed to. Call `check_header` first: an oversize block
-/// would panic the encoders here.
+/// Checks the txs on their own. The merkle root first, so every later failure follows from txs
+/// the header committed to. Call `check_header` first: an oversize block would panic the
+/// encoders here. See design §4, step 6.
 pub fn check_txs(block: &Block) -> Result<(), BlockError> {
     let txs = merkle_root(&block.txs);
     if block.header.tx_root != txs {
@@ -122,10 +122,10 @@ fn check_tx(tx: &Tx) -> Result<(), BlockError> {
         .map_err(|_| BlockError::BadSignature(tx.id()))
 }
 
-/// The root of an RFC 6962-shaped merkle tree over the txs' full encodings, signature included
-/// (design §3): leaf = SHA-256(0x00 ‖ tx), node = SHA-256(0x01 ‖ left ‖ right), a list of n > 1
-/// splits at the largest power of two below n, and the empty list hashes to SHA-256 of nothing.
-/// No leaf is duplicated, so two tx lists can't share a root.
+/// The root of an RFC 6962-shaped merkle tree over the txs' full encodings, signature included:
+/// leaf = SHA-256(0x00 ‖ tx), node = SHA-256(0x01 ‖ left ‖ right), a list of n > 1 splits at the
+/// largest power of two below n, and the empty list hashes to SHA-256 of nothing. No leaf is
+/// duplicated, so two tx lists can't share a root. See design §3.
 pub fn merkle_root(txs: &[Tx]) -> Hash {
     let leaves: Vec<Hash> = txs
         .iter()
@@ -213,7 +213,7 @@ mod tests {
         }
     }
 
-    /// Step 6 reads only `tx_root`.
+    /// `check_txs` reads only the header's `tx_root`.
     fn block(txs: Vec<Tx>) -> Block {
         Block {
             header: BlockHeader {
@@ -249,7 +249,7 @@ mod tests {
                 BlockError::WrongDifficulty(one),
             ),
             // 21 leading zero bits, one short of the target. Also ahead of the clock: bad PoW is
-            // reported, so it is remembered (design §4).
+            // reported, so it is remembered. See design §4.
             (
                 Block {
                     header: BlockHeader {
@@ -387,7 +387,7 @@ mod tests {
         );
         let not_utf8 = post(1, &[0xff]);
         let table = [
-            // block_1's empty root over a tx: the root is checked before the tx (design §4).
+            // block_1's empty root over a tx: the root is checked before the tx. See design §4.
             (
                 Block {
                     txs: vec![not_utf8.clone()],
