@@ -1,5 +1,5 @@
-//! Block tree: nodes with each block's state snapshot, tips, total work, fork point (design §3,
-//! §5).
+//! The tree of stored blocks, each with its total work and state snapshot, plus the tips and
+//! the fork point of any two blocks. See design §3 and §5.
 
 // std collections (not imbl): imbl's get_mut needs Clone, and BlockNode isn't.
 use std::collections::{HashMap, HashSet};
@@ -18,8 +18,8 @@ pub struct BlockNode {
     /// Parent's `total_work` + this block's work.
     pub total_work: U256,
     pub children: SmallVec<[BlockId; 2]>,
-    /// None below the finality horizon (design §6). Pruning isn't built yet, so every stored
-    /// block has one.
+    /// The state after this block, or None below the finality horizon. Pruning isn't built yet,
+    /// so every stored block has one. See design §6.
     pub state: Option<ChainState>,
 }
 
@@ -58,7 +58,7 @@ impl BlockStore {
     }
 
     /// The stored parent `block` would go under: `insert`'s checks, with nothing changed. The
-    /// manager builds the block's state on the parent's between the two (design §4).
+    /// manager builds the block's state on the parent's between the two. See design §4.
     pub fn parent_of(&self, block: &Block) -> Result<&BlockNode, StoreError> {
         let header = &block.header;
         let id = header.id();

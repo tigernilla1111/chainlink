@@ -1,7 +1,7 @@
-//! Fork choice and reorg (design §5): a block's state is built on its parent's when it's
-//! accepted, and the best tip is the one with the most total work, first seen on a tie. A
-//! reorg is a change of `best`; nothing is undone. Orphans and the invalid set come with the
-//! orphans and invalid block IDs item; the mempool and pruning with later items.
+//! Fork choice and reorg: a block's state is built on its parent's when it's accepted, and the
+//! best tip is the one with the most total work, first seen on a tie. A reorg is a change of
+//! `best`; nothing is undone. Orphans and the invalid set come with the orphans and invalid
+//! block IDs item; the mempool and pruning with later items. See design §5.
 
 use std::sync::Arc;
 
@@ -35,10 +35,11 @@ impl ChainManager {
         }
     }
 
-    /// Design §4 steps 1, 3, 5's height check, 7, and 8 without pruning (the rest of 5, and 2
-    /// and 6, are `validate.rs`): the block's state is its parent's with the block applied. A
-    /// failed accept stores nothing; orphans and the invalid set come with the orphans and
-    /// invalid block IDs item. A known block is a `Duplicate` error here, where step 1 drops it.
+    /// Accepts a block whose parent is stored: builds its state on the parent's, stores it, and
+    /// makes it the best tip if it has more total work. A failed accept stores nothing. A known
+    /// block is a `Duplicate` error here; the orphans and invalid block IDs item drops it as
+    /// already seen instead. The checks that need no state come with `validate.rs`, pruning
+    /// later. See design §4, steps 1, 3, 5's height check, 7 and 8.
     pub fn accept(&mut self, block: Arc<Block>) -> Result<BlockId, ValidationError> {
         let parent = self.store.parent_of(&block)?;
         let parent_state = parent
@@ -49,8 +50,8 @@ impl ChainManager {
         Ok(self.on_new_valid_block(block, state))
     }
 
-    /// Design §5: stores the block and switches only on strictly more work, so the tip seen
-    /// first wins a tie.
+    /// Stores the block and makes it the best tip only on strictly more work, so the tip seen
+    /// first wins a tie. See design §5.
     fn on_new_valid_block(&mut self, block: Arc<Block>, state: ChainState) -> BlockId {
         let id = self
             .store
