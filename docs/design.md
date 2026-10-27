@@ -75,6 +75,7 @@ flowchart TB
   mgr --> validate
   mempool --> types
   store --> types
+  store --> state
   state --> types
   validate --> types
 ```
@@ -92,7 +93,7 @@ src/
     crypto.rs       SHA-256, Ed25519 verification
     codec.rs        canonical bincode
     block.rs        BlockHeader, Block, Tx, TxPayload
-    store.rs        BlockStore: block tree, tips, orphans, invalid IDs
+    store.rs        BlockStore: block tree, per-block states, tips, orphans, invalid IDs
     state.rs        ChainState, apply_block
     validate.rs     checks that need no state (§4 steps 2, 5 and 6)
     manager.rs      ChainManager: fork choice, reorg, pruning, block building
@@ -178,7 +179,7 @@ The chain keeps no account records: the key is the identity, and `seen_txs` with
 ```rust
 use imbl::{HashSet, OrdMap};
 
-#[derive(Clone)]   // cheap: shares structure with the original
+#[derive(Clone, Debug, PartialEq, Eq)]   // clone is cheap: shares structure with the original
 pub struct ChainState {
     pub height:   u64,
     pub posts:    OrdMap<PostId, Arc<Post>>,
@@ -263,14 +264,18 @@ Only step 7 needs the parent's state. It also checks each tx's height window, `h
 - for a reply, name a post in this state and, if `reply_to` is set, a comment in that post's thread (deleted or not);
 - for a delete, name a post or comment in this state that isn't deleted, with `author` equal to the target's author (the signature itself is step 6).
 
-**What gets remembered as invalid.** Only failures that follow from the header, or from txs that match its `tx_root`: bad PoW, a failed header-vs-parent check, or a tx breaking a rule. Txs that don't match `tx_root` may be a peer's doing, and a timestamp ahead of the local clock may just be early. Those blocks can be tried again. `tx_root` uses a merkle tree that never duplicates a leaf, so two different tx lists can't share a root, and its leaves cover the signatures, so a peer can't swap one under an unchanged root.
+A tx meets these checks, and the step 6 ones, at up to three moments: on arrival (§7), when a miner builds a block, and in each block that includes it:
+
+![Which tx checks run on arrival, when building a block and when accepting one, and what a failure does at each](diagrams/tx-validation.svg)
+
+**What gets remembered as invalid.** Only failures that follow from the header, or from txs that match its `tx_root`: bad PoW, a failed header-vs-parent check, or a tx breaking a rule. A body that doesn't match `tx_root` may be a peer's doing, and a timestamp ahead of the local clock may just be early, so those blocks can be tried again. `tx_root` uses a merkle tree that never duplicates a leaf, so two different tx lists can't share a root, and its leaves cover the signatures, so a peer can't swap one under an unchanged root.
 
 **Orphans** (blocks whose parent hasn't arrived) are held keyed by the missing parent. When that parent is accepted, its orphans are processed. The pool is capped by total bytes (16 MB), count per parent, and age (60 s), and step 2 makes every orphan carry real work.
 
 ## 5. Fork choice and reorg
 
 ```rust
-fn on_new_valid_block(&mut self, block: Arc<Block>, state: ChainState) {
+fn on_new_valid_block(&mut self, block: Arc<Block>, state: ChainState) -> BlockId {
     // Computes its work, adds it to its parent's children, by_height and tips, and removes the parent from tips.
     let id = self.store.insert(block, state).expect("validated, so insert can't fail");
 
@@ -284,6 +289,7 @@ fn on_new_valid_block(&mut self, block: Arc<Block>, state: ChainState) {
         self.mempool.on_reorg(&disconnected, &connected);
     }
     self.prune();
+    id
 }
 
 // BlockStore. None if either ID isn't stored.

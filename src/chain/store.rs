@@ -1,4 +1,5 @@
-//! Block tree: nodes, tips, total work, fork point (design §3, §5).
+//! Block tree: nodes with each block's state snapshot, tips, total work, fork point (design §3,
+//! §5).
 
 // std collections (not imbl): imbl's get_mut needs Clone, and BlockNode isn't.
 use std::collections::{HashMap, HashSet};
@@ -8,6 +9,7 @@ use primitive_types::U256;
 use smallvec::SmallVec;
 
 use crate::chain::block::Block;
+use crate::chain::state::ChainState;
 use crate::chain::types::BlockId;
 
 pub struct BlockNode {
@@ -16,6 +18,9 @@ pub struct BlockNode {
     /// Parent's `total_work` + this block's work.
     pub total_work: U256,
     pub children: SmallVec<[BlockId; 2]>,
+    /// None below the finality horizon (design §6). Pruning isn't built yet, so every stored
+    /// block has one.
+    pub state: Option<ChainState>,
 }
 
 #[derive(thiserror::Error, Debug, PartialEq, Eq)]
@@ -34,8 +39,8 @@ pub struct BlockStore {
 }
 
 impl BlockStore {
-    /// Roots the tree at `genesis`, whose total work is its own work.
-    pub fn new(genesis: Arc<Block>) -> Self {
+    /// Roots the tree at `genesis`, whose total work is its own work, with its state.
+    pub fn new(genesis: Arc<Block>, state: ChainState) -> Self {
         let header = &genesis.header;
         let id = header.id();
         let total_work = header.work();
@@ -44,6 +49,7 @@ impl BlockStore {
             block: genesis,
             total_work,
             children: SmallVec::new(),
+            state: Some(state),
         };
         Self {
             nodes: HashMap::from([(id, node)]),
@@ -51,8 +57,9 @@ impl BlockStore {
         }
     }
 
-    /// Adds a block under its stored parent, which stops being a tip. A failed insert changes nothing.
-    pub fn insert(&mut self, block: Arc<Block>) -> Result<BlockId, StoreError> {
+    /// The stored parent `block` would go under: `insert`'s checks, with nothing changed. The
+    /// manager builds the block's state on the parent's between the two (design §4).
+    pub fn parent_of(&self, block: &Block) -> Result<&BlockNode, StoreError> {
         let header = &block.header;
         let id = header.id();
         if self.nodes.contains_key(&id) {
@@ -60,7 +67,7 @@ impl BlockStore {
         }
         let parent = self
             .nodes
-            .get_mut(&header.parent)
+            .get(&header.parent)
             .ok_or(StoreError::UnknownParent(header.parent))?;
         let parent_height = parent.block.header.height;
         if header.height.checked_sub(1) != Some(parent_height) {
@@ -69,9 +76,21 @@ impl BlockStore {
                 parent: parent_height,
             });
         }
-        let total_work = parent.total_work + header.work();
-        parent.children.push(id);
-        self.tips.remove(&header.parent);
+        Ok(parent)
+    }
+
+    /// Adds a block and its state under its stored parent, which stops being a tip. A failed
+    /// insert changes nothing.
+    pub fn insert(&mut self, block: Arc<Block>, state: ChainState) -> Result<BlockId, StoreError> {
+        let parent = self.parent_of(&block)?;
+        let total_work = parent.total_work + block.header.work();
+        let id = block.header.id();
+        self.nodes
+            .get_mut(&block.header.parent)
+            .expect("parent_of found it")
+            .children
+            .push(id);
+        self.tips.remove(&block.header.parent);
         self.tips.insert(id);
         self.nodes.insert(
             id,
@@ -80,6 +99,7 @@ impl BlockStore {
                 block,
                 total_work,
                 children: SmallVec::new(),
+                state: Some(state),
             },
         );
         Ok(id)
@@ -143,6 +163,11 @@ mod tests {
         block(BlockId(Hash([0; 32])), 0, EASY, 0)
     }
 
+    // The store never reads it.
+    fn state() -> ChainState {
+        ChainState::genesis()
+    }
+
     /// Each block goes on the last one half the time, else on any stored block. `check` runs on
     /// genesis alone and after each insert.
     fn random_tree(
@@ -151,7 +176,7 @@ mod tests {
         mut check: impl FnMut(&BlockStore, &HashMap<BlockId, BlockId>),
     ) -> (BlockStore, HashMap<BlockId, BlockId>) {
         let mut rng = StdRng::seed_from_u64(seed);
-        let mut store = BlockStore::new(genesis());
+        let mut store = BlockStore::new(genesis(), state());
         let mut ids = vec![genesis().header.id()];
         let mut parents = HashMap::new();
         check(&store, &parents);
@@ -164,7 +189,7 @@ mod tests {
             let difficulty = if rng.random_bool(0.5) { EASY } else { HARD };
             let height = store.get(parent).unwrap().block.header.height + 1;
             let id = store
-                .insert(block(parent, height, difficulty, nonce))
+                .insert(block(parent, height, difficulty, nonce), state())
                 .unwrap();
             parents.insert(id, parent);
             ids.push(id);
@@ -249,8 +274,8 @@ mod tests {
     #[test]
     fn bad_inserts_are_errors_and_change_nothing() {
         let g = genesis().header.id();
-        let mut store = BlockStore::new(genesis());
-        let a = store.insert(block(g, 1, EASY, 1)).unwrap();
+        let mut store = BlockStore::new(genesis(), state());
+        let a = store.insert(block(g, 1, EASY, 1), state()).unwrap();
         let unknown = BlockId(Hash([9; 32]));
         let bad = [
             (block(g, 1, EASY, 1), StoreError::Duplicate(a)),
@@ -281,7 +306,7 @@ mod tests {
             let children = store.get(parent).map(|n| n.children.clone());
             let stored = store.get(id).is_some();
 
-            assert_eq!(store.insert(block), Err(err));
+            assert_eq!(store.insert(block, state()), Err(err));
             assert_eq!(store.tips(), &tips);
             assert_eq!(store.get(parent).map(|n| n.children.clone()), children);
             assert_eq!(store.get(id).is_some(), stored);

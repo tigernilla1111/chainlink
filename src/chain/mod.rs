@@ -3,6 +3,7 @@
 pub mod block;
 pub mod codec;
 pub mod crypto;
+pub mod manager;
 pub mod state;
 pub mod store;
 pub mod types;
