@@ -31,13 +31,15 @@ Protocol constants, which every node must agree on:
 
 | Name | Value | Meaning |
 |---|---|---|
-| Difficulty | Fixed | Retargets every block from Phase 2 ([decisions](decisions.md)); until then the real block interval drifts with hashrate |
-| Block interval | 30 s | Expected time between blocks at the fixed difficulty |
+| `DIFFICULTY` | 2^22 (4,194,304), fixed | Expected hashes per block; retargets every block from Phase 2 ([decisions](decisions.md)) |
+| Block interval | 30 s | Target time between blocks, which `R`, `TX_TTL` and `FINALITY_DEPTH`'s durations assume; at the fixed difficulty the real interval is 2^22 / hashrate (about 2.5 s on one core) until Phase 2 retargets |
 | `MAX_BLOCK_BYTES` | 128 KB (131,072 bytes) | Largest serialized block |
-| `MAX_BODY_BYTES` | 1,024 bytes, provisional | Largest post or comment body, in UTF-8 bytes ([decisions](decisions.md#open)) |
+| `MAX_BODY_BYTES` | 1,024 bytes, provisional | Largest post or comment body, in UTF-8 bytes; a body is non-empty UTF-8 ([decisions](decisions.md#open)) |
 | `R` | 20,160 blocks (7 days) | How long a post and its thread live |
 | `TX_TTL` | 120 blocks (1 h), provisional | Longest a tx stays valid |
 | `FINALITY_DEPTH` | 24 blocks (12 min), provisional | Deepest reorg a node will follow |
+| `MAX_TIMESTAMP_AHEAD` | 132 s (2.2 min), provisional | How far past the local clock a block's timestamp may be |
+| `MEDIAN_BLOCKS` | 11 | A block's timestamp must be after the median timestamp of this many blocks ending at its parent |
 | Genesis block | Compiled in (`GENESIS_HEADER`) | The root of every chain, never validated; its ID starts every tx's signed bytes |
 
 Node limits, which peers don't need to agree on: `MAX_TIPS` = 64 forks tracked at once, the mempool byte cap (§7) and the orphan caps (§4).
@@ -120,7 +122,7 @@ pub struct BlockHeader {
     pub parent:     BlockId,
     pub height:     u64,
     pub timestamp:  u64,
-    pub tx_root:    Hash,         // merkle root over txs, bodies included
+    pub tx_root:    Hash,         // merkle root over txs' full encodings, signatures included
     pub difficulty: NonZeroU64,   // fixed for now
     pub nonce:      u64,
 }
@@ -144,7 +146,9 @@ pub enum TxPayload {
 }
 
 impl Tx {
-    /// SHA-256 of the signed bytes: genesis ID, author, valid_until_height, payload.
+    /// The bytes the author signs: genesis ID, author, valid_until_height, payload.
+    pub fn signed_bytes(&self) -> Vec<u8>;
+    /// SHA-256 of signed_bytes.
     pub fn id(&self) -> TxId;
     /// height ≤ valid_until_height ≤ height + TX_TTL.
     pub fn in_window(&self, height: u64) -> bool;
@@ -164,6 +168,8 @@ pub struct BlockNode {
 A block's work is its `difficulty`, and `total_work` is the plain sum along the chain. Fork choice only looks at `total_work`. A header meets its difficulty when its hash, read as a big-endian number, is at most `U256::MAX / difficulty`, rounded down. `difficulty` is a `NonZeroU64`: a header whose difficulty bytes are zero doesn't decode.
 
 Everything that gets hashed or signed is serialized with bincode 2 (little-endian, fixed-width ints, at most `MAX_BLOCK_BYTES`, no trailing bytes). Signed bytes start with the genesis block's ID, so a tx can't be replayed on another network. Nodes keep the decoded tx, not its bytes: IDs, signatures and the merkle root are all computed by re-serializing it, so the bytes it arrived in don't matter.
+
+`tx_root` is the root of an RFC 6962-shaped merkle tree over the txs' full encodings, signatures included: leaf = SHA-256(0x00 ‖ tx), node = SHA-256(0x01 ‖ left ‖ right), a list of n > 1 txs splits at the largest power of two below n, and a block with no txs has SHA-256 of nothing. No leaf is duplicated, so two tx lists can't share a root.
 
 ### State
 
@@ -240,11 +246,11 @@ Checks run cheapest first so bad blocks are rejected early.
 | # | Check | Notes |
 |---|---|---|
 | 1 | Already seen? | Known or known-invalid → drop |
-| 2 | Header on its own | `difficulty` equals the fixed difficulty and the header hash is at most `U256::MAX / difficulty` (§3), timestamp not too far ahead of the local clock, size limits |
+| 2 | Header on its own | `difficulty` equals the fixed difficulty and the header hash is at most `U256::MAX / difficulty` (§3), timestamp not too far ahead of the local clock (checked after PoW), size limits |
 | 3 | Parent known? | No → hold as orphan |
 | 4 | Parent usable? | Invalid → mark invalid. Below the horizon → drop |
-| 5 | Header vs parent | Height is parent + 1, timestamp after the median of recent blocks |
-| 6 | Txs on their own | Merkle root, format, body size, signatures (`verify_strict`) |
+| 5 | Header vs parent | Height is parent + 1 (the store checks it before step 7, since `apply_block` asserts it), timestamp after the median of the last `MEDIAN_BLOCKS` timestamps ending at the parent (fewer near genesis); the median is `sorted[n / 2]`, the upper middle for an even count |
+| 6 | Txs on their own | Merkle root, format (a post or comment body is non-empty UTF-8), body size, signatures (`verify_strict`) |
 | 7 | Txs against state | Applied in block order (below), each within its height window |
 | 8 | Commit | Insert, update tips, fork choice, prune |
 
@@ -257,7 +263,7 @@ Only step 7 needs the parent's state. It also checks each tx's height window, `h
 - for a reply, name a post in this state and, if `reply_to` is set, a comment in that post's thread (deleted or not);
 - for a delete, name a post or comment in this state that isn't deleted, with `author` equal to the target's author (the signature itself is step 6).
 
-**What gets remembered as invalid.** Only failures that follow from the header, or from txs that match its `tx_root`: bad PoW, a failed header-vs-parent check, or a tx breaking a rule. A body that doesn't match `tx_root` may be a peer's doing, and a timestamp ahead of the local clock may just be early, so those blocks can be tried again. `tx_root` uses a merkle tree that never duplicates a leaf, so two different tx lists can't share a root.
+**What gets remembered as invalid.** Only failures that follow from the header, or from txs that match its `tx_root`: bad PoW, a failed header-vs-parent check, or a tx breaking a rule. Txs that don't match `tx_root` may be a peer's doing, and a timestamp ahead of the local clock may just be early. Those blocks can be tried again. `tx_root` uses a merkle tree that never duplicates a leaf, so two different tx lists can't share a root, and its leaves cover the signatures, so a peer can't swap one under an unchanged root.
 
 **Orphans** (blocks whose parent hasn't arrived) are held keyed by the missing parent. When that parent is accepted, its orphans are processed. The pool is capped by total bytes (16 MB), count per parent, and age (60 s), and step 2 makes every orphan carry real work.
 
@@ -475,7 +481,7 @@ One mutex for now. If reads end up waiting on validation, move to one writer tas
 |---|---|---|
 | Flood of orphans | Orphan pool caps; orphans must carry real PoW | Now |
 | Resending invalid blocks | Remember invalid block IDs, capped | Now |
-| Getting an honest block marked invalid | Remember only failures that follow from the header or its `tx_root` | Now |
+| Getting an honest block marked invalid | Remember only failures that follow from the header or its `tx_root`, whose leaves cover the signatures | Now |
 | Many shallow forks | `MAX_TIPS` | Now |
 | Deep reorg | `FINALITY_DEPTH` | Now |
 | Huge posts | `MAX_BODY_BYTES` | Now |
