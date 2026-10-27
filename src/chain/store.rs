@@ -51,7 +51,8 @@ impl BlockStore {
         }
     }
 
-    /// Adds a block under its stored parent, which stops being a tip. A failed insert changes nothing.
+    /// Adds a block under its stored parent, which stops being a tip. A failed insert changes
+    /// nothing.
     pub fn insert(&mut self, block: Arc<Block>) -> Result<BlockId, StoreError> {
         let header = &block.header;
         let id = header.id();
