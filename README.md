@@ -35,7 +35,8 @@ One branch and PR per item. Tick it when it merges.
 - [x] `ChainState` and `apply_block` on a single chain, including dropping threads past `R`. Test: each validation rule on its own, including the `R` boundary.
 - [x] `validate.rs`: the checks that need no state (design §4 steps 2, 5 and 6): PoW and size limits, the timestamp against the local clock and the median of recent blocks (the store checks the height), merkle root, tx format, body size and signatures. Test: each check on its own, including the body-size and timestamp boundaries; a known-answer vector pins the merkle root, and a tx signed for another genesis is rejected.
 - [x] Fork choice and reorg. Test: in a random tree, the best tip has the most work of the tips the node tracks, and its state matches a replay along the best chain.
-- [ ] Orphans and invalid block IDs (design §4 steps 1, 3 and 4). Test: blocks arriving in any order end in the same tree and best tip as in order; the orphan pool drops past its byte, per-parent and age caps; a known-invalid block, and a child of one, is rejected without applying it.
+- [x] Orphans and invalid block IDs (design §4 steps 1, 3 and 4). Test: blocks arriving in any order end in the same tree and best tip as in order; the orphan pool drops past its byte, per-parent and age caps; a known-invalid block, and a child of one, is rejected without applying it.
+- [ ] Run `validate.rs`'s checks in `accept` (design §4 steps 2, 5 and 6): `check_header` before a block can be held as an orphan, `check_parent` with the parent chain's last `MEDIAN_BLOCKS` timestamps, `check_txs` before `apply_block`, remembering as invalid only what design §4 says. Test: a block failing each check is rejected by `accept`; a timestamp not after the median and a failing tx are remembered; a wrong difficulty, insufficient work, a timestamp ahead of the clock and a `tx_root` mismatch are not; a block with insufficient work is never held as an orphan.
 - [ ] Pruning. Test: a fork whose fork point is just below the horizon is dropped; one whose fork point is at the horizon survives.
 - [ ] Mempool and block building. Test: a built block always passes validation, even at the `R` and expiry boundaries, and fits in `MAX_BLOCK_BYTES`; a reorg puts disconnected txs back; under random orders of tx arrivals and blocks, including the same tx in both forks of a reorg, the mempool never holds a tx in the best tip's `seen_txs`; a tx arriving with `valid_until_height` at best + 1 or best + 1 + `TX_TTL` is kept, and one past either end is dropped.
 - [ ] Read API. Test: `min_conf = 3` sees exactly the state two blocks below the tip, deletes included.
@@ -68,6 +69,7 @@ One branch and PR per item. Tick it when it merges.
 - Let users break fork ties: when two tips have equal work, show one post from each and mine on the block whose post the user picks. Only the tie-break changes, so most work still wins, and first-seen stays the default if the user doesn't pick in time.
 - Earn invites by mining, capped so mining power doesn't turn into social power
 - Drop mempool replies and deletes whose post has aged out past `R`, instead of keeping them until `valid_until_height`. Block building already skips them, so this only saves mempool space.
+- Score peers: give a resent known-invalid block its own error, `KnownInvalid`, instead of `AlreadySeen`, so the network layer can penalise the peer that sent it.
 
 **Not planned:** operator takedowns, keeping content past `R`, media.
 

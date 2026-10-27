@@ -4,6 +4,15 @@ Newest first. Add an entry in the PR that makes the decision. To reverse one, ad
 
 ## Decided
 
+**2026-10-27: At most 4 orphans wait on one missing parent, that parent's oldest dropped first.**
+Fills in design §4's "count per parent". An honest missing parent usually has one or two children waiting (a race at one height), so 4 leaves two spare, and one withheld parent holds at most 4 × 128 KB = 512 KB, 1/32 of the 16 MB pool. 3 and 8 were weighed: 3 leaves one spare for the same race, 8 lets one parent hold 1 MB for no honest gain. The cost: a fifth honest child of one parent is dropped and has to be fetched again.
+
+**2026-10-27: The invalid set holds 4,096 block IDs, oldest dropped first.**
+Fills in design §3's "capped". About 100 bytes per ID with its set and order entries, so about 400 KB. It only needs the bad blocks whose parent is above the finality horizon: step 4 drops a block whose parent is below it after a lookup. An attacker mines about f × 24 blocks per horizon window, f being their hashrate over the network's, so cycling 4,096 IDs through the set within a window takes about 170× the network's hashrate. Only blocks that passed step 2 are remembered (entry below), so every entry costs about 2.5 s of one core at today's difficulty. 65,536 IDs (about 6 MB) was weighed and would only save re-checks. The cost: past that, a resent bad block is checked again, steps 5 to 7.
+
+**2026-10-27: A block with bad PoW is not remembered as invalid.**
+Qualifies the 2026-10-25 timestamp entry's "a block with bad PoW is still remembered as invalid". A wrong difficulty is one compare, and checking the work is one SHA-256 of the header, the same hash the invalid-set lookup needs for the ID, so remembering such a block saves nothing; and since a header with bad PoW costs nothing to make, remembering them would let anyone push all 4,096 real entries out of the set for free. Keeping them was weighed: the set would then only stop casual resends.
+
 **2026-10-25: `tx_root` is an RFC 6962-shaped merkle root over the txs' full encodings, signatures included.**
 Without signatures in the leaves, a peer could swap a tx's signature under an unchanged `tx_root` and get an honest block remembered as invalid (design §11). No leaf is duplicated, so two tx lists can't share a root. The cost: an inclusion proof carries the whole tx.
 

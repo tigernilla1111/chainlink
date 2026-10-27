@@ -15,8 +15,9 @@ use crate::chain::{
     DIFFICULTY, MAX_BLOCK_BYTES, MAX_BODY_BYTES, MAX_TIMESTAMP_AHEAD, MEDIAN_BLOCKS,
 };
 
-/// `TimestampAhead` and `TxRootMismatch` may not be the block's fault, so the block isn't
-/// remembered as invalid. See design §4.
+/// `WrongDifficulty` and `InsufficientWork` cost nothing to make, and checking one again costs the
+/// one hash the invalid-set lookup would. `TimestampAhead` and `TxRootMismatch` may not be the
+/// block's fault. None of them is remembered as invalid. See design §4.
 #[derive(thiserror::Error, Debug, PartialEq, Eq)]
 pub enum BlockError {
     // check_header
@@ -53,8 +54,7 @@ pub fn check_header(block: &Block, now: u64) -> Result<(), BlockError> {
     if header.difficulty != DIFFICULTY {
         return Err(BlockError::WrongDifficulty(header.difficulty));
     }
-    // The hash read big-endian must be at most U256::MAX / difficulty. Before the clock check,
-    // so bad PoW is always remembered as invalid. See design §3.
+    // The hash read big-endian must be at most U256::MAX / difficulty. See design §3.
     let hash = U256::from_big_endian(&header.id().0.0);
     if hash > U256::MAX / header.difficulty.get() {
         return Err(BlockError::InsufficientWork);
@@ -248,8 +248,8 @@ mod tests {
                 t,
                 BlockError::WrongDifficulty(one),
             ),
-            // 21 leading zero bits, one short of the target. Also ahead of the clock: bad PoW is
-            // reported, so it is remembered. See design §4.
+            // 21 leading zero bits, one short of the target. Also ahead of the clock: the work is
+            // checked first. See design §4.
             (
                 Block {
                     header: BlockHeader {
