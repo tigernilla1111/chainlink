@@ -1,4 +1,4 @@
-//! Blocks and transactions (design §3).
+//! Blocks and transactions. See design §3.
 
 use std::num::NonZeroU64;
 
@@ -18,8 +18,9 @@ pub struct BlockHeader {
     pub timestamp: u64,
     /// Merkle root over the txs, bodies included.
     pub tx_root: Hash,
-    /// The header hash, read big-endian, must be at most `U256::MAX / difficulty` (design §3).
-    /// Fixed until Phase 2, which retargets it every block (design §1).
+    /// How hard the block is to mine: its header hash, read big-endian, must be at most
+    /// `U256::MAX / difficulty`. Fixed until Phase 2, which retargets it every block.
+    /// See design §1 and §3.
     pub difficulty: NonZeroU64,
     pub nonce: u64,
 }
@@ -29,7 +30,7 @@ impl BlockHeader {
         BlockId(sha256(&serialize(self).expect("a header always encodes")))
     }
 
-    /// A block's work is its difficulty (design §3).
+    /// A block's work is its difficulty. See design §3.
     pub fn work(&self) -> U256 {
         U256::from(self.difficulty.get())
     }
@@ -68,8 +69,8 @@ pub enum TxPayload {
 
 impl Tx {
     /// SHA-256 of the bytes the author signed: the genesis ID, then author, valid_until_height
-    /// and payload (design §3). The genesis ID keeps a tx from being replayed on another network.
-    /// Panics on a tx too big for a block, so check a loose tx's size before calling this.
+    /// and payload. The genesis ID keeps a tx from being replayed on another network. Panics on
+    /// a tx too big for a block, so check a loose tx's size before calling this. See design §3.
     pub fn id(&self) -> TxId {
         let signed = (
             GENESIS_ID,
@@ -82,8 +83,9 @@ impl Tx {
         ))
     }
 
-    /// `height ≤ valid_until_height ≤ height + TX_TTL`: the tx may be included at `height`
-    /// (design §4). The mempool's arrival check uses it with the best height + 1.
+    /// Whether a block at `height` may include the tx: `valid_until_height` is at least
+    /// `height` and at most `TX_TTL` above it. The mempool's arrival check uses it with the
+    /// best height + 1. See design §4.
     pub fn in_window(&self, height: u64) -> bool {
         height <= self.valid_until_height && self.valid_until_height <= height + TX_TTL
     }

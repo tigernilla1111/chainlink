@@ -14,18 +14,18 @@ use std::sync::Arc;
 use crate::chain::block::{Block, BlockHeader};
 use crate::chain::types::{BlockId, Hash};
 
-/// Largest serialized block: 128 KB (design §1).
+/// Largest serialized block: 128 KB. See design §1.
 pub const MAX_BLOCK_BYTES: usize = 128 * 1024;
-/// How many blocks a post and its thread live: 7 days (design §1, §8).
+/// How many blocks a post and its thread live: 7 days. See design §1 and §8.
 pub const R: u64 = 20_160;
-/// Longest a tx stays valid, in blocks: 1 h, provisional (design §1, §8).
+/// Longest a tx stays valid, in blocks: 1 hour. The value is provisional. See design §1 and §8.
 pub const TX_TTL: u64 = 120;
 // The state's block ring relies on it: advancing looks up block `h − TX_TTL − 1` in the last
 // `R + 1` blocks.
 const _: () = assert!(TX_TTL <= R);
 
-/// The block every chain starts from, the same on every node (design §1). Nodes compile it
-/// in and never validate it, so its `tx_root` is a plain zero hash and its difficulty is 1.
+/// The block every chain starts from, the same on every node. Nodes compile it in and never
+/// validate it, so its `tx_root` is a plain zero hash and its difficulty is 1. See design §1.
 pub const GENESIS_HEADER: BlockHeader = BlockHeader {
     parent: BlockId(Hash([0; 32])),
     height: 0,
