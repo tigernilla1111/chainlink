@@ -19,7 +19,7 @@ pub struct BlockHeader {
     /// Merkle root over the txs, bodies included.
     pub tx_root: Hash,
     /// The header hash, read big-endian, must be at most `U256::MAX / difficulty` (design §3).
-    /// Fixed for now.
+    /// Fixed until Phase 2, which retargets it every block (design §1).
     pub difficulty: NonZeroU64,
     pub nonce: u64,
 }
