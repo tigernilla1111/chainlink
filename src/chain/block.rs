@@ -16,7 +16,7 @@ pub struct BlockHeader {
     pub parent: BlockId,
     pub height: u64,
     pub timestamp: u64,
-    /// Merkle root over the txs, bodies included.
+    /// Merkle root over the txs' full encodings, signatures included. See design §3.
     pub tx_root: Hash,
     /// How hard the block is to mine: its header hash, read big-endian, must be at most
     /// `U256::MAX / difficulty`. Fixed until Phase 2, which retargets it every block.
@@ -68,19 +68,22 @@ pub enum TxPayload {
 }
 
 impl Tx {
-    /// SHA-256 of the bytes the author signed: the genesis ID, then author, valid_until_height
-    /// and payload. The genesis ID keeps a tx from being replayed on another network. Panics on
-    /// a tx too big for a block, so check a loose tx's size before calling this. See design §3.
-    pub fn id(&self) -> TxId {
+    /// The bytes the author signs: the genesis ID, then author, valid_until_height and payload.
+    /// The genesis ID keeps a tx from being replayed on another network. Panics on a tx too big
+    /// for a block, so check a loose tx's size before calling this. See design §3.
+    pub fn signed_bytes(&self) -> Vec<u8> {
         let signed = (
             GENESIS_ID,
             self.author,
             self.valid_until_height,
             &self.payload,
         );
-        TxId(sha256(
-            &serialize(&signed).expect("a tx from a block always encodes"),
-        ))
+        serialize(&signed).expect("a tx from a block always encodes")
+    }
+
+    /// SHA-256 of `signed_bytes`. See design §3.
+    pub fn id(&self) -> TxId {
+        TxId(sha256(&self.signed_bytes()))
     }
 
     /// Whether a block at `height` may include the tx: `valid_until_height` is at least

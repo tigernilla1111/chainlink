@@ -4,6 +4,18 @@ Newest first. Add an entry in the PR that makes the decision. To reverse one, ad
 
 ## Decided
 
+**2026-10-25: `tx_root` is an RFC 6962-shaped merkle root over the txs' full encodings, signatures included.**
+Without signatures in the leaves, a peer could swap a tx's signature under an unchanged `tx_root` and get an honest block remembered as invalid (design §11). No leaf is duplicated, so two tx lists can't share a root. The cost: an inclusion proof carries the whole tx.
+
+**2026-10-25: A block's timestamp is at most 132 s past the local clock, and after the median of the last 11 blocks.**
+132 s (2.2 min, provisional) is about four 30 s target intervals: room for ordinary clock skew, little room to skew Phase 2's retarget. The median of the last 11 timestamps ending at the parent bounds how far back a miner can push them. The clock check runs after PoW, so a block with bad PoW is still remembered as invalid. The caller passes the clock in; `chain` never reads one.
+
+**2026-10-25: The fixed difficulty is `DIFFICULTY` = 2^22 until Phase 2's retarget.**
+About 2.5 s a block on one core in release, so local nodes mine at a usable pace before the retarget, while a block still costs real work. Qualifies the 2026-03-01 "30 s blocks" entry until then: 30 s stays the target that `R`, `TX_TTL` and `FINALITY_DEPTH`'s durations assume. Tests never mine (a debug build hashes at about 0.08 MH/s): one header was mined offline and its nonce pinned.
+
+**2026-10-25: A post or comment body is non-empty UTF-8 of at most `MAX_BODY_BYTES`, counted in bytes, not characters.**
+Checked in step 6, so the state never sees a malformed body. Deletes have no body.
+
 **2026-10-24: Accounts are forgotten: no account records, the key is the identity.**
 Settles open question 4 on its lean. `seen_txs` with a `TX_TTL` expiry blocks replays, so a node rebuilds everything from the blocks within `R`. Invites, if adopted, will need renewing within `R`.
 
