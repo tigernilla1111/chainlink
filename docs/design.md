@@ -258,6 +258,10 @@ Only step 7 needs the parent's state. It also checks each tx's height window, `h
 - for a reply, name a post in this state and, if `reply_to` is set, a comment in that post's thread (deleted or not);
 - for a delete, name a post or comment in this state that isn't deleted, with `author` equal to the target's author (the signature itself is step 6).
 
+A tx meets these checks, and the step 6 ones, at up to three moments: on arrival (§7), when a miner builds a block, and in each block that includes it:
+
+![Which tx checks run on arrival, when building a block and when accepting one, and what a failure does at each](diagrams/tx-validation.svg)
+
 **What gets remembered as invalid.** Only failures that follow from the header, or from txs that match its `tx_root`: bad PoW, a failed header-vs-parent check, or a tx breaking a rule. A body that doesn't match `tx_root` may be a peer's doing, and a timestamp ahead of the local clock may just be early, so those blocks can be tried again. `tx_root` uses a merkle tree that never duplicates a leaf, so two different tx lists can't share a root.
 
 **Orphans** (blocks whose parent hasn't arrived) are held keyed by the missing parent. When that parent is accepted, its orphans are processed. The pool is capped by total bytes (16 MB), count per parent, and age (60 s), and step 2 makes every orphan carry real work.
