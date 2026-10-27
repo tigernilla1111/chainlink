@@ -24,15 +24,16 @@ pub const TX_TTL: u64 = 120;
 // The state's block ring relies on it: advancing looks up block `h − TX_TTL − 1` in the last
 // `R + 1` blocks.
 const _: () = assert!(TX_TTL <= R);
-/// The fixed difficulty, 2^22 expected hashes per block (design §1). Every header must carry
-/// it until Phase 2's per-block retarget replaces the equality check in `validate`.
+/// The fixed difficulty, 2^22 expected hashes per block. Every header must carry it until
+/// Phase 2's per-block retarget replaces the equality check in `validate`. See design §1.
 pub const DIFFICULTY: NonZeroU64 = NonZeroU64::new(1 << 22).unwrap();
-/// Largest post or comment body, in UTF-8 bytes, provisional (design §1).
+/// Largest post or comment body, in UTF-8 bytes. The value is provisional. See design §1.
 pub const MAX_BODY_BYTES: usize = 1024;
-/// How far past the local clock a block's timestamp may be, in seconds, provisional (design §4).
+/// How far past the local clock a block's timestamp may be, in seconds. The value is
+/// provisional. See design §4.
 pub const MAX_TIMESTAMP_AHEAD: u64 = 132;
 /// A block's timestamp must be after the median timestamp of this many blocks ending at its
-/// parent, fewer near genesis (design §4).
+/// parent, fewer near genesis. See design §4.
 pub const MEDIAN_BLOCKS: usize = 11;
 
 /// The block every chain starts from, the same on every node. Nodes compile it in and never
