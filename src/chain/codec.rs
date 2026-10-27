@@ -29,7 +29,6 @@ pub fn serialize<T: serde::Serialize>(value: &T) -> Result<Vec<u8>, EncodeError>
 pub fn deserialize<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T, DecodeError> {
     let (value, bytes_read) = decode_from_slice(bytes, CONFIG)?;
 
-    // ensure no trailing bytes
     if bytes_read != bytes.len() {
         return Err(DecodeError::Other("trailing bytes".into()));
     }
