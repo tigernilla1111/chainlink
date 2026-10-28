@@ -70,6 +70,7 @@ One branch and PR per item. Tick it when it merges.
 - Earn invites by mining, capped so mining power doesn't turn into social power
 - Drop mempool replies and deletes whose post has aged out past `R`, instead of keeping them until `valid_until_height`. Block building already skips them, so this only saves mempool space.
 - Score peers: give a resent known-invalid block its own error, `KnownInvalid`, instead of `AlreadySeen`, so the network layer can penalise the peer that sent it.
+- CI: a GitHub Actions workflow that runs `cargo fmt --check`, `cargo clippy` and `cargo test` on every PR. Free while the repo is public.
 
 **Not planned:** operator takedowns, keeping content past `R`, media.
 
