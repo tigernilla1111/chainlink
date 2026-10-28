@@ -42,7 +42,7 @@ Protocol constants, which every node must agree on:
 | `MEDIAN_BLOCKS` | 11 | A block's timestamp must be after the median timestamp of this many blocks ending at its parent |
 | Genesis block | Compiled in (`GENESIS_HEADER`) | The root of every chain, never validated; its ID starts every tx's signed bytes |
 
-Node limits, which peers don't need to agree on: `MAX_TIPS` = 64 forks tracked at once, the mempool byte cap (§7) and the orphan caps (§4).
+Node limits, which peers don't need to agree on: `MAX_TIPS` = 64 forks tracked at once, the mempool byte cap (§7), the orphan caps and the invalid set's cap (§4).
 
 Key crates: `imbl` (persistent maps, so snapshots share structure) and `primitive-types` (U256 work). The node adds `tokio`, plus a crate for its client API once Phase 3 picks one (JSON-RPC with `jsonrpsee` is the current idea).
 
@@ -222,13 +222,14 @@ flowchart LR
 
 ```rust
 pub struct BlockStore {
-    nodes:        HashMap<BlockId, BlockNode>,
-    by_height:    BTreeMap<u64, SmallVec<[BlockId; 2]>>,
-    tips:         HashSet<BlockId>,
-    invalid:      HashSet<BlockId>,   // capped, oldest dropped first
-    orphans:      HashMap<BlockId, Vec<(Arc<Block>, Instant)>>,   // keyed by the missing parent
-    orphan_bytes: usize,
-    finalized:    BlockId,
+    nodes:         HashMap<BlockId, BlockNode>,
+    by_height:     BTreeMap<u64, SmallVec<[BlockId; 2]>>,
+    tips:          HashSet<BlockId>,
+    invalid:       HashSet<BlockId>,    // capped, oldest dropped first
+    invalid_order: VecDeque<BlockId>,   // the same IDs oldest first, for the cap
+    orphans:       HashMap<BlockId, Vec<(Arc<Block>, u64, usize)>>,   // keyed by the missing parent; when each was held, its encoded size
+    orphan_bytes:  usize,
+    finalized:     BlockId,
 }
 
 pub struct ChainManager {
@@ -246,7 +247,7 @@ Checks run cheapest first so bad blocks are rejected early.
 
 | # | Check | Notes |
 |---|---|---|
-| 1 | Already seen? | Known or known-invalid → drop |
+| 1 | Already seen? | Stored, held as an orphan or known-invalid → drop |
 | 2 | Header on its own | `difficulty` equals the fixed difficulty and the header hash is at most `U256::MAX / difficulty` (§3), timestamp not too far ahead of the local clock (checked after PoW), size limits |
 | 3 | Parent known? | No → hold as orphan |
 | 4 | Parent usable? | Invalid → mark invalid. Below the horizon → drop |
@@ -268,9 +269,9 @@ A tx meets these checks, and the step 6 ones, at up to three moments: on arrival
 
 ![Which tx checks run on arrival, when building a block and when accepting one, and what a failure does at each](diagrams/tx-validation.svg)
 
-**What gets remembered as invalid.** Only failures that follow from the header, or from txs that match its `tx_root`: bad PoW, a failed header-vs-parent check, or a tx breaking a rule. A body that doesn't match `tx_root` may be a peer's doing, and a timestamp ahead of the local clock may just be early, so those blocks can be tried again. `tx_root` uses a merkle tree that never duplicates a leaf, so two different tx lists can't share a root, and its leaves cover the signatures, so a peer can't swap one under an unchanged root.
+**What gets remembered as invalid.** Only failures that follow from the header, or from txs that match its `tx_root`: a failed header-vs-parent check, or a tx breaking a rule. A body that doesn't match `tx_root` may be a peer's doing, and a timestamp ahead of the local clock may just be early, so those blocks can be tried again. A header with the wrong difficulty or too little work isn't remembered either: checking it again costs the one hash that looking up its ID would, and remembering it would let anyone push real entries out of the set for free. `tx_root` uses a merkle tree that never duplicates a leaf, so two different tx lists can't share a root, and its leaves cover the signatures, so a peer can't swap one under an unchanged root. The set holds 4,096 IDs, oldest dropped first ([decisions](decisions.md)).
 
-**Orphans** (blocks whose parent hasn't arrived) are held keyed by the missing parent. When that parent is accepted, its orphans are processed. The pool is capped by total bytes (16 MB), count per parent, and age (60 s), and step 2 makes every orphan carry real work.
+**Orphans** (blocks whose parent hasn't arrived) are held keyed by the missing parent. When that parent is accepted, its orphans are processed, and theirs in turn; if it turns out invalid, they are marked invalid with it, since a child of an invalid block is invalid. The pool is capped by total bytes (16 MB), count per parent (4, [decisions](decisions.md)) and age (60 s, checked as each block arrives, with the clock the caller passes), each dropping the oldest first, and step 2 makes every orphan carry real work.
 
 ## 5. Fork choice and reorg
 
@@ -472,7 +473,7 @@ A reorg here only makes a post briefly appear and disappear, so the app can use 
 pub struct ChainHandle(Arc<Mutex<ChainManager>>);
 
 impl ChainHandle {
-    pub fn submit_block(&self, b: Arc<Block>) -> Result<Accepted, ValidationError>;
+    pub fn submit_block(&self, b: Arc<Block>, now: u64) -> Result<Accepted, ValidationError>;
     pub fn submit_tx(&self, tx: Tx) -> Result<(), ValidationError>;
     pub fn build_candidate(&self) -> Vec<Tx>;   // on the best tip
     pub fn view(&self, min_conf: u32) -> Arc<Snapshot>;
