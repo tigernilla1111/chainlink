@@ -63,6 +63,7 @@ One branch and PR per item. Tick it when it merges.
 - Faster block propagation, if forks are common: send the header and tx IDs only, since peers already have the txs in their mempool
 - Permissioned miner set, if forks are common: fewer, known miners means fewer races ([open question 1](docs/decisions.md#open))
 - Invite-only signup, if spam calls for it ([open question 2](docs/decisions.md#open))
+- On-chain allow list, once every node must enforce it: `Allow` txs signed by a 2-of-3 threshold admin key, entries renewed within `R`, replacing the node setting. Restart from a new genesis. Member invites then build on it: an `Allow` is also valid when an allowed account signs it within its invite quota.
 - Lock-free reads, if profiling shows contention
 
 **Much later:**
