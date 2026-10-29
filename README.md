@@ -54,6 +54,7 @@ One branch and PR per item. Tick it when it merges.
 - [ ] Investigate the best way to do a UI and the client API it uses. Current idea: the node serves a web UI that signs txs through a WASM build of `chain`, over JSON-RPC. Compare it with the alternatives, including REST or another transport instead of JSON-RPC.
 - [ ] Investigate the security implications of the chosen API: abuse and resource exhaustion from public callers, requests from other sites in a browser, and which methods (mining, peers) must stay local-only
 - [ ] CLI or small client. Make it a client of the node's API, not a caller of node internals, and have it sign txs itself so the node never holds user keys. Add a fixed-port option to the node. Then a web UI can come later as a second client of the same API.
+- [ ] Allow list while the network is small: a node setting listing the keys whose txs the node relays and builds into blocks, so only people the operator added can post. It's node policy, not a consensus rule: a block with a tx from an unlisted key is still valid, so dropping the list later is a setting change, not a fork. Deletes are exempt, so a key taken off the list can still delete its posts. It gates new posts and takes nothing down; what's already posted ages out after `R` as usual. Remove it once the network can handle spam another way ([open question 2](docs/decisions.md#open)). Test: a tx from an unlisted key is dropped on arrival and skipped by block building, and a delete from one is kept; a block that includes one is still accepted; with no list set, the same tx is kept.
 - [ ] Split `chain` into its own library crate, once the CLI needs it. Keep it buildable for `wasm32` (no tokio, disk or OS randomness), checked in CI, so a web UI can sign txs with it.
 - [ ] Restart cache: keep the in-memory blocks on disk so a restart doesn't resync
 
@@ -62,6 +63,7 @@ One branch and PR per item. Tick it when it merges.
 - Faster block propagation, if forks are common: send the header and tx IDs only, since peers already have the txs in their mempool
 - Permissioned miner set, if forks are common: fewer, known miners means fewer races ([open question 1](docs/decisions.md#open))
 - Invite-only signup, if spam calls for it ([open question 2](docs/decisions.md#open))
+- On-chain allow list, once every node must enforce it: `Allow` txs signed by a 2-of-3 threshold admin key, entries renewed within `R`, replacing the node setting. Restart from a new genesis. Member invites then build on it: an `Allow` is also valid when an allowed account signs it within its invite quota.
 - Lock-free reads, if profiling shows contention
 
 **Much later:**

@@ -121,7 +121,7 @@ Spam is handled by identity gating and/or per-tx PoW.
 ## Open
 
 1. Open mining or a permissioned miner set. Leaning permissioned: forks would be rarer, so `FINALITY_DEPTH` and `MAX_TIPS` could be smaller. With no block rewards, open mining may draw little honest hashrate, which makes the chain cheap to out-mine.
-2. How spam is limited: identity gating, per-tx PoW, or both. Leaning toward invite-only signup, with one invite per account per period, counted in blocks rather than wall-clock time.
+2. How spam is limited: identity gating, per-tx PoW, or both. Leaning toward invite-only signup, with one invite per account per period, counted in blocks rather than wall-clock time. Leaning toward getting there in stages: the allow list as a node setting first, then an on-chain allow list edited by a 2-of-3 threshold admin key, then member invites on top of it, each a restart from a new genesis while the network is small.
 3. Max post body size. Provisionally 1,024 bytes, about 1,000 characters of English text or 250 emoji. At that size a full block holds about 120 posts.
 4. Settled: accounts are forgotten (2026-10-24, above).
 5. Recovering from a fork deeper than `FINALITY_DEPTH`. A split longer than 12 minutes (a partition, or a miner that kept mining offline) leaves nodes on different chains for good. Options include an operator command to switch forks, and miners pausing when they have no peers.
