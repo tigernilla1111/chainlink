@@ -72,6 +72,7 @@ One branch and PR per item. Tick it when it merges.
 
 - Let users break fork ties: when two tips have equal work, show one post from each and mine on the block whose post the user picks. Only the tie-break changes, so most work still wins, and first-seen stays the default if the user doesn't pick in time.
 - Earn invites by mining, capped so mining power doesn't turn into social power
+- Ban the inviter too, once invites and bans exist: when a reader bans an account, the app also hides the account that invited it, so giving invites to spammers costs the inviter. A filter over the chain's reads; nodes still store and serve everything, so it isn't an operator takedown. To decide first: who bans (each reader, shared lists a reader follows, or a vote), whether the inviter is hidden on the first ban or only after several, and how the app keeps the invite link once the invite ages out past `R`. Test: after Carol bans Bob, whom Alice invited, Carol's feed and threads show nothing by Alice or Bob, while Dave's still show both.
 - Drop mempool replies and deletes whose post has aged out past `R`, instead of keeping them until `valid_until_height`. Block building already skips them, so this only saves mempool space.
 - Score peers: give a resent known-invalid block its own error, `KnownInvalid`, instead of `AlreadySeen`, so the network layer can penalise the peer that sent it.
 - CI: a GitHub Actions workflow that runs `cargo fmt --check`, `cargo clippy` and `cargo test` on every PR. Free while the repo is public.
