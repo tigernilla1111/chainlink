@@ -51,6 +51,7 @@ One branch and PR per item. Tick it when it merges.
 **Phase 3: app**
 
 - [ ] `feed` and `thread` reads
+- [ ] Likes: a `Like { target }` tx likes a post or comment, at most once per account per target, and `feed` and `thread` show each item's like count. A like needs its post within `R`, as a reply does, and is dropped with that thread. A deleted item can't be liked. Unlike is a `Delete` of the like, after which the account can like the item again. Test: a second like by the same account on the same target is rejected, and one after a `Delete` of the first is accepted; a like on a post created at height `p` applies at `p + R` and fails at `p + R + 1`; a like on a deleted item is rejected; a known-answer vector pins a `Like` tx's signed bytes.
 - [ ] Investigate the best way to do a UI and the client API it uses. Current idea: the node serves a web UI that signs txs through a WASM build of `chain`, over JSON-RPC. Compare it with the alternatives, including REST or another transport instead of JSON-RPC.
 - [ ] Investigate the security implications of the chosen API: abuse and resource exhaustion from public callers, requests from other sites in a browser, and which methods (mining, peers) must stay local-only
 - [ ] CLI or small client. Make it a client of the node's API, not a caller of node internals, and have it sign txs itself so the node never holds user keys. Add a fixed-port option to the node. Then a web UI can come later as a second client of the same API.
@@ -65,6 +66,7 @@ One branch and PR per item. Tick it when it merges.
 - Invite-only signup, if spam calls for it ([open question 2](docs/decisions.md#open))
 - On-chain allow list, once every node must enforce it: `Allow` txs signed by a 2-of-3 threshold admin key, entries renewed within `R`, replacing the node setting. Restart from a new genesis. Member invites then build on it: an `Allow` is also valid when an allowed account signs it within its invite quota.
 - Lock-free reads, if profiling shows contention
+- Compact likes, if they crowd posts out of blocks: a full block holds about 935 likes of 140 bytes, 64 of them signature. A miner groups likes by target and aggregates their signatures, so a like costs well under 140 bytes. Plain Ed25519 signatures don't combine, so this needs half-aggregation or a scheme such as BLS.
 
 **Much later:**
 
