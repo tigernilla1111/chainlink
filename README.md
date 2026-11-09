@@ -55,6 +55,7 @@ One branch and PR per item. Tick it when it merges.
 - [ ] Investigate the security implications of the chosen API: abuse and resource exhaustion from public callers, requests from other sites in a browser, and which methods (mining, peers) must stay local-only
 - [ ] CLI or small client. Make it a client of the node's API, not a caller of node internals, and have it sign txs itself so the node never holds user keys. Add a fixed-port option to the node. Then a web UI can come later as a second client of the same API.
 - [ ] Allow list while the network is small: a node setting listing the keys whose txs the node relays and builds into blocks, so only people the operator added can post. It's node policy, not a consensus rule: a block with a tx from an unlisted key is still valid, so dropping the list later is a setting change, not a fork. Deletes are exempt, so a key taken off the list can still delete its posts. It gates new posts and takes nothing down; what's already posted ages out after `R` as usual. Remove it once the network can handle spam another way ([open question 2](docs/decisions.md#open)). Test: a tx from an unlisted key is dropped on arrival and skipped by block building, and a delete from one is kept; a block that includes one is still accepted; with no list set, the same tx is kept.
+- [ ] Block in the client: hide an account, or one post or comment, from the feed and threads. The list stays in the client next to the key, so no one else can tell, it costs no block space, and it outlasts `R`. Only your view changes; other people still see what you hid. A hidden comment shows as a marker, like a deleted one, so other people's replies under it keep their place. Taking an account off the network is the allow list's job. Test: a blocked account's posts and comments, and a hidden post or comment, don't show in the feed or a thread; others' replies under them still do; unblocking shows them again.
 - [ ] Split `chain` into its own library crate, once the CLI needs it. Keep it buildable for `wasm32` (no tokio, disk or OS randomness), checked in CI, so a web UI can sign txs with it.
 - [ ] Restart cache: keep the in-memory blocks on disk so a restart doesn't resync
 
@@ -63,7 +64,9 @@ One branch and PR per item. Tick it when it merges.
 - Faster block propagation, if forks are common: send the header and tx IDs only, since peers already have the txs in their mempool
 - Permissioned miner set, if forks are common: fewer, known miners means fewer races ([open question 1](docs/decisions.md#open))
 - Invite-only signup, if spam calls for it ([open question 2](docs/decisions.md#open))
+- Admin key storage, before the on-chain allow list: investigate where to keep its three keys, each in a separate place, so one lost or leaked key can neither sign nor lock the list; and a CI check that fails a PR committing a private key or seed.
 - On-chain allow list, once every node must enforce it: `Allow` txs signed by a 2-of-3 threshold admin key, entries renewed within `R`, replacing the node setting. Restart from a new genesis. Member invites then build on it: an `Allow` is also valid when an allowed account signs it within its invite quota.
+- Node deny list, once people run a client with its own node: the client passes its blocked accounts to the node, which then drops their txs on arrival and skips them in block building. It's node policy, not a consensus rule: a block that includes one is still valid, so the more hashrate blocks an account, the longer its txs take to get in.
 - Lock-free reads, if profiling shows contention
 
 **Much later:**
@@ -74,7 +77,7 @@ One branch and PR per item. Tick it when it merges.
 - Score peers: give a resent known-invalid block its own error, `KnownInvalid`, instead of `AlreadySeen`, so the network layer can penalise the peer that sent it.
 - CI: a GitHub Actions workflow that runs `cargo fmt --check`, `cargo clippy` and `cargo test` on every PR. Free while the repo is public.
 
-**Not planned:** operator takedowns, keeping content past `R`, media.
+**Not planned:** keeping content past `R`, media.
 
 ## Open questions
 

@@ -4,6 +4,9 @@ Newest first. Add an entry in the PR that makes the decision. To reverse one, ad
 
 ## Decided
 
+**2026-11-08: Blocking is a filter in the client, with no on-chain block.**
+A user hides an account, or one post or comment, in their own client; the chain doesn't change, and taking someone off the network is the allow list's job. An on-chain `Block` tx was weighed: consensus would reject a blocked account's replies under the blocker's posts, so no one would see them, but the state would gain a block set per account, renewed within `R`, every block would be public, and the new tx type needs a new genesis. The cost: a blocked account can still reply under your posts, and everyone else sees those replies.
+
 **2026-10-27: At most 4 orphans wait on one missing parent, that parent's oldest dropped first.**
 Fills in design §4's "count per parent". An honest missing parent usually has one or two children waiting (a race at one height), so 4 leaves two spare, and one withheld parent holds at most 4 × 128 KB = 512 KB, 1/32 of the 16 MB pool. 3 and 8 were weighed: 3 leaves one spare for the same race, 8 lets one parent hold 1 MB for no honest gain. The cost: a fifth honest child of one parent is dropped and has to be fetched again.
 
