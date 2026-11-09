@@ -42,6 +42,7 @@ One branch and PR per item. Tick it when it merges.
 
 **Phase 2: two nodes talking**
 
+- [ ] Permissioned miners: only miners in an approved set can make blocks ([decisions](docs/decisions.md#decided)). Test: a block from a miner outside the set is rejected, and so is one whose proof of its miner fails.
 - [ ] Two local nodes mine, gossip, post, comment, delete, and read
 - [ ] Per-block difficulty retargeting from recent block times. Test: in a simulation where hashrate jumps 10× up or down, block time is back within 10% of 30 s after one window of blocks; a block with any other difficulty is rejected.
 - [ ] Measure fork rate and fork depth, and set `FINALITY_DEPTH` from them
@@ -59,7 +60,6 @@ One branch and PR per item. Tick it when it merges.
 **Later, only if needed:**
 
 - Faster block propagation, if forks are common: send the header and tx IDs only, since peers already have the txs in their mempool
-- Permissioned miner set, if forks are common: fewer, known miners means fewer races ([open question 1](docs/decisions.md#open))
 - Invite-only signup, if spam calls for it ([open question 2](docs/decisions.md#open))
 - Lock-free reads, if profiling shows contention
 

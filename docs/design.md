@@ -488,5 +488,5 @@ One mutex for now. If reads end up waiting on validation, move to one writer tas
 | Filling the mempool | Step 6 checks and the height window before relay, byte cap, `TX_TTL` expiry | Now |
 | Replaying included txs into mempools | Arrival drops txs in the best tip's `seen_txs` (§7) | Now |
 | Spam | Identity gating and/or per-tx PoW | Open question 2 |
-| Out-mining honest miners | Permissioned miners | Open question 1 |
+| Out-mining honest miners | Permissioned miners ([decisions](decisions.md#decided)) | Phase 2 |
 | Invite farming | Rate limit by block height | With invites |

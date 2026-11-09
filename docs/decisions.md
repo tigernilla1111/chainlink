@@ -4,6 +4,9 @@ Newest first. Add an entry in the PR that makes the decision. To reverse one, ad
 
 ## Decided
 
+**2026-11-08: Mining is permissioned through Phase 3, and opens only with a memory-hard PoW.**
+Settles open question 1 on its lean. With no block rewards, honest hashrate is a few users' machines, so an attacker renting cloud machines for an hour could out-mine the network, and SHA-256 runs far faster on a GPU, so one GPU could too. Only miners in an approved set can make blocks, so rented hashrate can't take part, and with fewer, known miners forks are rarer, so `FINALITY_DEPTH` and `MAX_TIPS` could be smaller. Open mining with a memory-hard PoW such as RandomX or Argon2 lost: it keeps CPUs competitive with GPUs, but small chains on memory-hard PoW, such as Bitcoin Gold on Equihash, were still 51%-attacked with rented hashrate. If mining opens once honest hashrate is large, the PoW hash becomes memory-hard, which reverses the 2026-03-25 SHA-256 entry for the PoW hash. The cost: someone has to choose the miners, and the chain stops when none of them is online.
+
 **2026-10-24: Accounts are forgotten: no account records, the key is the identity.**
 Settles open question 4 on its lean. `seen_txs` with a `TX_TTL` expiry blocks replays, so a node rebuilds everything from the blocks within `R`. Invites, if adopted, will need renewing within `R`.
 
@@ -99,7 +102,7 @@ Spam is handled by identity gating and/or per-tx PoW.
 
 ## Open
 
-1. Open mining or a permissioned miner set. Leaning permissioned: forks would be rarer, so `FINALITY_DEPTH` and `MAX_TIPS` could be smaller. With no block rewards, open mining may draw little honest hashrate, which makes the chain cheap to out-mine.
+1. Settled: mining is permissioned through Phase 3 (2026-11-08, above).
 2. How spam is limited: identity gating, per-tx PoW, or both. Leaning toward invite-only signup, with one invite per account per period, counted in blocks rather than wall-clock time.
 3. Max post body size. Provisionally 1,024 bytes, about 1,000 characters of English text or 250 emoji. At that size a full block holds about 120 posts.
 4. Settled: accounts are forgotten (2026-10-24, above).
