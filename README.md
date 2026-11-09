@@ -51,6 +51,7 @@ One branch and PR per item. Tick it when it merges.
 **Phase 3: app**
 
 - [ ] `feed` and `thread` reads
+- [ ] Likes: a `Like { target }` tx likes a post or comment, at most once per account per target, and `feed` and `thread` show each item's like count. A like needs its post within `R`, as a reply does, and is dropped with that thread. A deleted item can't be liked. Unlike is a `Delete` of the like, after which the account can like the item again. Test: a second like by the same account on the same target is rejected, and one after a `Delete` of the first is accepted; a like on a post created at height `p` applies at `p + R` and fails at `p + R + 1`; a like on a deleted item is rejected; a known-answer vector pins a `Like` tx's signed bytes.
 - [ ] Investigate the best way to do a UI and the client API it uses. Current idea: the node serves a web UI that signs txs through a WASM build of `chain`, over JSON-RPC. Compare it with the alternatives, including REST or another transport instead of JSON-RPC.
 - [ ] Investigate the security implications of the chosen API: abuse and resource exhaustion from public callers, requests from other sites in a browser, and which methods (mining, peers) must stay local-only
 - [ ] CLI or small client. Make it a client of the node's API, not a caller of node internals, and have it sign txs itself so the node never holds user keys. Add a fixed-port option to the node. Then a web UI can come later as a second client of the same API.
@@ -68,11 +69,13 @@ One branch and PR per item. Tick it when it merges.
 - On-chain allow list, once every node must enforce it: `Allow` txs signed by a 2-of-3 threshold admin key, entries renewed within `R`, replacing the node setting. Restart from a new genesis. Member invites then build on it: an `Allow` is also valid when an allowed account signs it within its invite quota.
 - Node deny list, once people run a client with its own node: the client passes its blocked accounts to the node, which then drops their txs on arrival and skips them in block building. It's node policy, not a consensus rule: a block that includes one is still valid, so the more hashrate blocks an account, the longer its txs take to get in.
 - Lock-free reads, if profiling shows contention
+- Compact likes, if they crowd posts out of blocks: a full block holds about 935 likes of 140 bytes, 64 of them signature. A miner groups likes by target and aggregates their signatures, so a like costs well under 140 bytes. Plain Ed25519 signatures don't combine, so this needs half-aggregation or a scheme such as BLS.
 
 **Much later:**
 
 - Let users break fork ties: when two tips have equal work, show one post from each and mine on the block whose post the user picks. Only the tie-break changes, so most work still wins, and first-seen stays the default if the user doesn't pick in time.
 - Earn invites by mining, capped so mining power doesn't turn into social power
+- Ban the inviter too, once invites and bans exist: when a reader bans an account, the app also hides the account that invited it, so giving invites to spammers costs the inviter. A filter over the chain's reads; nodes still store and serve everything, so it isn't an operator takedown. To decide first: who bans (each reader, shared lists a reader follows, or a vote), whether the inviter is hidden on the first ban or only after several, and how the app keeps the invite link once the invite ages out past `R`. Test: after Carol bans Bob, whom Alice invited, Carol's feed and threads show nothing by Alice or Bob, while Dave's still show both.
 - Drop mempool replies and deletes whose post has aged out past `R`, instead of keeping them until `valid_until_height`. Block building already skips them, so this only saves mempool space.
 - Score peers: give a resent known-invalid block its own error, `KnownInvalid`, instead of `AlreadySeen`, so the network layer can penalise the peer that sent it.
 - Miner curation: a miner can veto mempool txs, one at a time or by author, and block building skips a vetoed tx as it skips one known invalid on that tip. A veto is local: the tx stays valid, other miners can still include it, and the node accepts their blocks, so a veto delays a tx rather than keeping it off the chain. Test: a built block never holds a vetoed tx, and a block from another miner that holds one is accepted.
