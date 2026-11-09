@@ -7,6 +7,30 @@ Newest first. Add an entry in the PR that makes the decision. To reverse one, ad
 **2026-11-08: Mining is permissioned through Phase 3, and opens only with a memory-hard PoW.**
 Settles open question 1 on its lean. With no block rewards, honest hashrate is a few users' machines, so an attacker renting cloud machines for an hour could out-mine the network, and SHA-256 runs far faster on a GPU, so one GPU could too. Only miners in an approved set can make blocks, so rented hashrate can't take part, and with fewer, known miners forks are rarer, so `FINALITY_DEPTH` and `MAX_TIPS` could be smaller. Open mining with a memory-hard PoW such as RandomX or Argon2 lost: it keeps CPUs competitive with GPUs, but small chains on memory-hard PoW, such as Bitcoin Gold on Equihash, were still 51%-attacked with rented hashrate. If mining opens once honest hashrate is large, the PoW hash becomes memory-hard, which reverses the 2026-03-25 SHA-256 entry for the PoW hash. The cost: someone has to choose the miners, and the chain stops when none of them is online.
 
+**2026-11-08: Blocking is a filter in the client, with no on-chain block.**
+A user hides an account, or one post or comment, in their own client; the chain doesn't change, and taking someone off the network is the allow list's job. An on-chain `Block` tx was weighed: consensus would reject a blocked account's replies under the blocker's posts, so no one would see them, but the state would gain a block set per account, renewed within `R`, every block would be public, and the new tx type needs a new genesis. The cost: a blocked account can still reply under your posts, and everyone else sees those replies.
+
+**2026-10-27: At most 4 orphans wait on one missing parent, that parent's oldest dropped first.**
+Fills in design §4's "count per parent". An honest missing parent usually has one or two children waiting (a race at one height), so 4 leaves two spare, and one withheld parent holds at most 4 × 128 KB = 512 KB, 1/32 of the 16 MB pool. 3 and 8 were weighed: 3 leaves one spare for the same race, 8 lets one parent hold 1 MB for no honest gain. The cost: a fifth honest child of one parent is dropped and has to be fetched again.
+
+**2026-10-27: The invalid set holds 4,096 block IDs, oldest dropped first.**
+Fills in design §3's "capped". About 100 bytes per ID with its set and order entries, so about 400 KB. It only needs the bad blocks whose parent is above the finality horizon: step 4 drops a block whose parent is below it after a lookup. An attacker mines about f × 24 blocks per horizon window, f being their hashrate over the network's, so cycling 4,096 IDs through the set within a window takes about 170× the network's hashrate. Only blocks that passed step 2 are remembered (entry below), so every entry costs about 2.5 s of one core at today's difficulty. 65,536 IDs (about 6 MB) was weighed and would only save re-checks. The cost: past that, a resent bad block is checked again, steps 5 to 7.
+
+**2026-10-27: A block with bad PoW is not remembered as invalid.**
+Qualifies the 2026-10-25 timestamp entry's "a block with bad PoW is still remembered as invalid". A wrong difficulty is one compare, and checking the work is one SHA-256 of the header, the same hash the invalid-set lookup needs for the ID, so remembering such a block saves nothing; and since a header with bad PoW costs nothing to make, remembering them would let anyone push all 4,096 real entries out of the set for free. Keeping them was weighed: the set would then only stop casual resends.
+
+**2026-10-25: `tx_root` is an RFC 6962-shaped merkle root over the txs' full encodings, signatures included.**
+Without signatures in the leaves, a peer could swap a tx's signature under an unchanged `tx_root` and get an honest block remembered as invalid (design §11). No leaf is duplicated, so two tx lists can't share a root. The cost: an inclusion proof carries the whole tx.
+
+**2026-10-25: A block's timestamp is at most 132 s past the local clock, and after the median of the last 11 blocks.**
+132 s (2.2 min, provisional) is about four 30 s target intervals: room for ordinary clock skew, little room to skew Phase 2's retarget. The median of the last 11 timestamps ending at the parent bounds how far back a miner can push them. The clock check runs after PoW, so a block with bad PoW is still remembered as invalid. The caller passes the clock in; `chain` never reads one.
+
+**2026-10-25: The fixed difficulty is `DIFFICULTY` = 2^22 until Phase 2's retarget.**
+About 2.5 s a block on one core in release, so local nodes mine at a usable pace before the retarget, while a block still costs real work. Qualifies the 2026-03-01 "30 s blocks" entry until then: 30 s stays the target that `R`, `TX_TTL` and `FINALITY_DEPTH`'s durations assume. Tests never mine (a debug build hashes at about 0.08 MH/s): one header was mined offline and its nonce pinned.
+
+**2026-10-25: A post or comment body is non-empty UTF-8 of at most `MAX_BODY_BYTES`, counted in bytes, not characters.**
+Checked in step 6, so the state never sees a malformed body. Deletes have no body.
+
 **2026-10-24: Accounts are forgotten: no account records, the key is the identity.**
 Settles open question 4 on its lean. `seen_txs` with a `TX_TTL` expiry blocks replays, so a node rebuilds everything from the blocks within `R`. Invites, if adopted, will need renewing within `R`.
 
@@ -103,7 +127,7 @@ Spam is handled by identity gating and/or per-tx PoW.
 ## Open
 
 1. Settled: mining is permissioned through Phase 3 (2026-11-08, above).
-2. How spam is limited: identity gating, per-tx PoW, or both. Leaning toward invite-only signup, with one invite per account per period, counted in blocks rather than wall-clock time.
+2. How spam is limited: identity gating, per-tx PoW, or both. Leaning toward invite-only signup, with one invite per account per period, counted in blocks rather than wall-clock time. Leaning toward getting there in stages: the allow list as a node setting first, then an on-chain allow list edited by a 2-of-3 threshold admin key, then member invites on top of it, each a restart from a new genesis while the network is small.
 3. Max post body size. Provisionally 1,024 bytes, about 1,000 characters of English text or 250 emoji. At that size a full block holds about 120 posts.
 4. Settled: accounts are forgotten (2026-10-24, above).
 5. Recovering from a fork deeper than `FINALITY_DEPTH`. A split longer than 12 minutes (a partition, or a miner that kept mining offline) leaves nodes on different chains for good. Options include an operator command to switch forks, and miners pausing when they have no peers.

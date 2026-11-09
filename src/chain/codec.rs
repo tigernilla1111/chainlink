@@ -1,5 +1,5 @@
-//! Canonical bincode (design §3): little-endian, fixed-width ints, at most `MAX_BLOCK_BYTES`,
-//! no trailing bytes.
+//! How everything hashed or signed becomes bytes, the same on every node: bincode with
+//! little-endian, fixed-width ints, at most `MAX_BLOCK_BYTES`, no trailing bytes. See design §3.
 
 use bincode::{
     config::{Configuration, Fixint, Limit, LittleEndian},

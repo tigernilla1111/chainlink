@@ -1,5 +1,6 @@
-//! Per-block state snapshots and `apply_block` (design §3, §4, §8). No account records: the key
-//! is the identity, and `seen_txs` blocks replays.
+//! The state after each block (posts, comments and threads) and `apply_block`, which builds a
+//! block's state from its parent's. There are no account records: an author is just a public
+//! key, and `seen_txs` blocks replays. See design §3, §4 and §8.
 
 use std::sync::Arc;
 
@@ -22,7 +23,7 @@ pub struct ChainState {
     /// Txs that haven't expired yet.
     pub seen_txs: HashSet<TxId>,
     /// The last `R + 1` blocks by height (every block while the chain is shorter), read when
-    /// advancing (design §8). Keyed by height, so the expiring blocks are plain lookups.
+    /// advancing. Keyed by height, so the expiring blocks are plain lookups. See design §8.
     pub blocks: OrdMap<u64, Arc<Block>>,
 }
 
@@ -83,9 +84,9 @@ impl ChainState {
         }
     }
 
-    /// The state one block later, at height `h`, before any tx (design §8): the `seen_txs`
-    /// entries of block `h − TX_TTL − 1` go, and the posts of block `h − R − 1` go with their
-    /// threads.
+    /// The state one block later, at height `h`, before any tx: posts from block `h − R − 1`
+    /// age out with their threads, and the `seen_txs` entries from block `h − TX_TTL − 1`
+    /// expire. See design §8.
     fn advanced(&self) -> Self {
         let mut state = self.clone();
         state.height += 1;
@@ -114,7 +115,7 @@ impl ChainState {
     }
 
     /// Removes a post and every comment under it. A post's comments are one key range of
-    /// `threads` (design §3), and no comment outlives its post, since a reply needs its post.
+    /// `threads`, and no comment outlives its post, since a reply needs its post. See design §3.
     fn drop_thread(&mut self, post: PostId) {
         self.posts.remove(&post);
         let thread: Vec<_> = self
@@ -128,8 +129,8 @@ impl ChainState {
         }
     }
 
-    /// Applies one tx at this state's height (design §4). Everything is checked before
-    /// anything is written, so a failed tx leaves the state as it was.
+    /// Applies one tx at this state's height. Everything is checked before anything is written,
+    /// so a failed tx leaves the state as it was. See design §4.
     fn apply_tx(&mut self, tx: &Tx) -> Result<(), TxError> {
         let id = tx.id();
         let height = self.height;
@@ -235,9 +236,10 @@ impl ChainState {
     }
 }
 
-/// The parent's state with `block` applied (design §4): advanced to the block's height, then
-/// its txs in order, so a tx can rely on an earlier one in the same block. The parent is
-/// never changed. Step 5 checks the height first (design §4), so another height is a caller bug.
+/// The parent's state with `block` applied: advanced to the block's height, then its txs in
+/// order, so a tx can rely on an earlier one in the same block. The parent is never changed.
+/// Panics unless `block` is at the parent's height + 1, which validation checks before this
+/// runs. See design §4.
 pub fn apply_block(parent: &ChainState, block: &Arc<Block>) -> Result<ChainState, TxError> {
     let height = block.header.height;
     assert_eq!(

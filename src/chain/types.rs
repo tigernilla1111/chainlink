@@ -1,4 +1,4 @@
-//! IDs. All 32 bytes (design §3).
+//! The IDs of blocks, txs, posts, comments and accounts, all 32 bytes. See design §3.
 
 use serde::{Deserialize, Serialize};
 

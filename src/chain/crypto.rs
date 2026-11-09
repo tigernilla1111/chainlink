@@ -1,4 +1,4 @@
-//! SHA-256 and Ed25519 verification (design §2). Signing lives with the app.
+//! SHA-256 and Ed25519 verification. Signing lives with the app. See design §2.
 
 use ed25519_dalek::VerifyingKey;
 use sha2::{Digest, Sha256};
