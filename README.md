@@ -67,7 +67,6 @@ One branch and PR per item. Tick it when it merges.
 - Invite-only signup, if spam calls for it ([open question 2](docs/decisions.md#open))
 - Admin key storage, before the on-chain allow list: investigate where to keep its three keys, each in a separate place, so one lost or leaked key can neither sign nor lock the list; and a CI check that fails a PR committing a private key or seed.
 - On-chain allow list, once every node must enforce it: `Allow` txs signed by a 2-of-3 threshold admin key, entries renewed within `R`, replacing the node setting. Restart from a new genesis. Member invites then build on it: an `Allow` is also valid when an allowed account signs it within its invite quota.
-- Node deny list, once people run a client with its own node: the client passes its blocked accounts to the node, which then drops their txs on arrival and skips them in block building. It's node policy, not a consensus rule: a block that includes one is still valid, so the more hashrate blocks an account, the longer its txs take to get in.
 - Lock-free reads, if profiling shows contention
 - Compact likes, if they crowd posts out of blocks: a full block holds about 935 likes of 140 bytes, 64 of them signature. A miner groups likes by target and aggregates their signatures, so a like costs well under 140 bytes. Plain Ed25519 signatures don't combine, so this needs half-aggregation or a scheme such as BLS.
 
@@ -80,6 +79,7 @@ One branch and PR per item. Tick it when it merges.
 - Score peers: give a resent known-invalid block its own error, `KnownInvalid`, instead of `AlreadySeen`, so the network layer can penalise the peer that sent it.
 - Miner curation: a miner can veto mempool txs, one at a time or by author, and block building skips a vetoed tx as it skips one known invalid on that tip. A veto is local: the tx stays valid, other miners can still include it, and the node accepts their blocks, so a veto delays a tx rather than keeping it off the chain. Test: a built block never holds a vetoed tx, and a block from another miner that holds one is accepted.
 - Trust network, after miner curation: a miner names peers it trusts and includes the txs they relay without reviewing them itself, while txs from other peers wait for its review. Trust replaces only the review: every tx still passes every check. Needs a key per peer, which Phase 2's peers don't have. Test: a tx first relayed by a trusted peer goes into the next built block without review, and the same tx from an untrusted peer waits.
+- Node deny list, after miner curation: a client that runs its own node passes its blocked accounts to the node as vetoes by author, so the node skips their txs in block building. A block that includes one is still valid, so the more hashrate blocks an account, the longer its txs take to get in.
 - CI: a GitHub Actions workflow that runs `cargo fmt --check`, `cargo clippy` and `cargo test` on every PR. Free while the repo is public.
 
 **Not planned:** keeping content past `R`, media.
