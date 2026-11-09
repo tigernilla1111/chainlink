@@ -51,10 +51,12 @@ One branch and PR per item. Tick it when it merges.
 **Phase 3: app**
 
 - [ ] `feed` and `thread` reads
+- [ ] Likes: a `Like { target }` tx likes a post or comment, at most once per account per target, and `feed` and `thread` show each item's like count. A like needs its post within `R`, as a reply does, and is dropped with that thread. A deleted item can't be liked. Unlike is a `Delete` of the like, after which the account can like the item again. Test: a second like by the same account on the same target is rejected, and one after a `Delete` of the first is accepted; a like on a post created at height `p` applies at `p + R` and fails at `p + R + 1`; a like on a deleted item is rejected; a known-answer vector pins a `Like` tx's signed bytes.
 - [ ] Investigate the best way to do a UI and the client API it uses. Current idea: the node serves a web UI that signs txs through a WASM build of `chain`, over JSON-RPC. Compare it with the alternatives, including REST or another transport instead of JSON-RPC.
 - [ ] Investigate the security implications of the chosen API: abuse and resource exhaustion from public callers, requests from other sites in a browser, and which methods (mining, peers) must stay local-only
 - [ ] CLI or small client. Make it a client of the node's API, not a caller of node internals, and have it sign txs itself so the node never holds user keys. Add a fixed-port option to the node. Then a web UI can come later as a second client of the same API.
 - [ ] Allow list while the network is small: a node setting listing the keys whose txs the node relays and builds into blocks, so only people the operator added can post. It's node policy, not a consensus rule: a block with a tx from an unlisted key is still valid, so dropping the list later is a setting change, not a fork. Deletes are exempt, so a key taken off the list can still delete its posts. It gates new posts and takes nothing down; what's already posted ages out after `R` as usual. Remove it once the network can handle spam another way ([open question 2](docs/decisions.md#open)). Test: a tx from an unlisted key is dropped on arrival and skipped by block building, and a delete from one is kept; a block that includes one is still accepted; with no list set, the same tx is kept.
+- [ ] Block in the client: hide an account, or one post or comment, from the feed and threads. The list stays in the client next to the key, so no one else can tell, it costs no block space, and it outlasts `R`. Only your view changes; other people still see what you hid. A hidden comment shows as a marker, like a deleted one, so other people's replies under it keep their place. Taking an account off the network is the allow list's job. Test: a blocked account's posts and comments, and a hidden post or comment, don't show in the feed or a thread; others' replies under them still do; unblocking shows them again.
 - [ ] Split `chain` into its own library crate, once the CLI needs it. Keep it buildable for `wasm32` (no tokio, disk or OS randomness), checked in CI, so a web UI can sign txs with it.
 - [ ] Restart cache: keep the in-memory blocks on disk so a restart doesn't resync
 
@@ -63,18 +65,24 @@ One branch and PR per item. Tick it when it merges.
 - Faster block propagation, if forks are common: send the header and tx IDs only, since peers already have the txs in their mempool
 - Permissioned miner set, if forks are common: fewer, known miners means fewer races ([open question 1](docs/decisions.md#open))
 - Invite-only signup, if spam calls for it ([open question 2](docs/decisions.md#open))
+- Admin key storage, before the on-chain allow list: investigate where to keep its three keys, each in a separate place, so one lost or leaked key can neither sign nor lock the list; and a CI check that fails a PR committing a private key or seed.
 - On-chain allow list, once every node must enforce it: `Allow` txs signed by a 2-of-3 threshold admin key, entries renewed within `R`, replacing the node setting. Restart from a new genesis. Member invites then build on it: an `Allow` is also valid when an allowed account signs it within its invite quota.
 - Lock-free reads, if profiling shows contention
+- Compact likes, if they crowd posts out of blocks: a full block holds about 935 likes of 140 bytes, 64 of them signature. A miner groups likes by target and aggregates their signatures, so a like costs well under 140 bytes. Plain Ed25519 signatures don't combine, so this needs half-aggregation or a scheme such as BLS.
 
 **Much later:**
 
 - Let users break fork ties: when two tips have equal work, show one post from each and mine on the block whose post the user picks. Only the tie-break changes, so most work still wins, and first-seen stays the default if the user doesn't pick in time.
 - Earn invites by mining, capped so mining power doesn't turn into social power
+- Ban the inviter too, once invites and bans exist: when a reader bans an account, the app also hides the account that invited it, so giving invites to spammers costs the inviter. A filter over the chain's reads; nodes still store and serve everything, so it isn't an operator takedown. To decide first: who bans (each reader, shared lists a reader follows, or a vote), whether the inviter is hidden on the first ban or only after several, and how the app keeps the invite link once the invite ages out past `R`. Test: after Carol bans Bob, whom Alice invited, Carol's feed and threads show nothing by Alice or Bob, while Dave's still show both.
 - Drop mempool replies and deletes whose post has aged out past `R`, instead of keeping them until `valid_until_height`. Block building already skips them, so this only saves mempool space.
 - Score peers: give a resent known-invalid block its own error, `KnownInvalid`, instead of `AlreadySeen`, so the network layer can penalise the peer that sent it.
+- Miner curation: a miner can veto mempool txs, one at a time or by author, and block building skips a vetoed tx as it skips one known invalid on that tip. A veto is local: the tx stays valid, other miners can still include it, and the node accepts their blocks, so a veto delays a tx rather than keeping it off the chain. Test: a built block never holds a vetoed tx, and a block from another miner that holds one is accepted.
+- Trust network, after miner curation: a miner names peers it trusts and includes the txs they relay without reviewing them itself, while txs from other peers wait for its review. Trust replaces only the review: every tx still passes every check. Needs a key per peer, which Phase 2's peers don't have. Test: a tx first relayed by a trusted peer goes into the next built block without review, and the same tx from an untrusted peer waits.
+- Node deny list, after miner curation: a client that runs its own node passes its blocked accounts to the node as vetoes by author, so the node skips their txs in block building. A block that includes one is still valid, so the more hashrate blocks an account, the longer its txs take to get in.
 - CI: a GitHub Actions workflow that runs `cargo fmt --check`, `cargo clippy` and `cargo test` on every PR. Free while the repo is public.
 
-**Not planned:** operator takedowns, keeping content past `R`, media.
+**Not planned:** keeping content past `R`, media.
 
 ## Open questions
 
