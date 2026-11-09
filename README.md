@@ -67,6 +67,7 @@ One branch and PR per item. Tick it when it merges.
 - Invite-only signup, if spam calls for it ([open question 2](docs/decisions.md#open))
 - Admin key storage, before the on-chain allow list: investigate where to keep its three keys, each in a separate place, so one lost or leaked key can neither sign nor lock the list; and a CI check that fails a PR committing a private key or seed.
 - On-chain allow list, once every node must enforce it: `Allow` txs signed by a 2-of-3 threshold admin key, entries renewed within `R`, replacing the node setting. Restart from a new genesis. Member invites then build on it: an `Allow` is also valid when an allowed account signs it within its invite quota.
+- Open mining with a RandomX variant, once honest hashrate is large ([decisions](docs/decisions.md#decided)). Rate-limit and ban peers that send bad PoW, since a check costs about 10 to 20 ms instead of one SHA-256, and revisit the 2026-10-27 bad-PoW entry.
 - Lock-free reads, if profiling shows contention
 - Compact likes, if they crowd posts out of blocks: a full block holds about 935 likes of 140 bytes, 64 of them signature. A miner groups likes by target and aggregates their signatures, so a like costs well under 140 bytes. Plain Ed25519 signatures don't combine, so this needs half-aggregation or a scheme such as BLS.
 
