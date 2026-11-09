@@ -133,7 +133,7 @@ Spam is handled by identity gating and/or per-tx PoW.
 5. Recovering from a fork deeper than `FINALITY_DEPTH`. A split longer than 12 minutes (a partition, or a miner that kept mining offline) leaves nodes on different chains for good. Options include an operator command to switch forks, and miners pausing when they have no peers.
 6. How a new node finds the real chain without blocks back to genesis: keep every header (about 100 MB a year, no content), or ship checkpoints.
 7. How the app and network get updated, including which settings can change without restarting the network. A restart is acceptable but should be rare.
-8. Which PoW if mining opens. Leaning toward a RandomX variant (2026-11-08, above). SHA-256 on GPUs stays in the running if enough honest people with good GPUs mine to outweigh what an attacker can rent.
+8. Which PoW if mining opens. Leaning toward a RandomX variant (2026-11-08, above). SHA-256 on GPUs stays in the running if enough honest people with good GPUs mine to outweigh what an attacker can rent. RandomX wins if many ordinary users mine, but botnets favor it and rarely have GPUs, so measure how many people actually mine before choosing.
 
 ## Assumptions
 
