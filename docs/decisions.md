@@ -4,6 +4,9 @@ Newest first. Add an entry in the PR that makes the decision. To reverse one, ad
 
 ## Decided
 
+**2026-11-08: Mining is permissioned through Phase 3.**
+Settles open question 1 on its lean. With no block rewards, honest hashrate is a few users' machines, so an attacker renting cloud machines for an hour could out-mine the network, and SHA-256 runs far faster on a GPU, so one GPU could too. Only miners in an approved set can make blocks, so rented hashrate can't take part, and with fewer, known miners forks are rarer, so `FINALITY_DEPTH` and `MAX_TIPS` could be smaller. Open mining with a memory-hard PoW such as RandomX or Argon2 lost: it keeps CPUs competitive with GPUs, but small chains on memory-hard PoW, such as Bitcoin Gold on Equihash, were still 51%-attacked with rented hashrate. If mining opens once honest hashrate is large, its PoW is open question 8, leaning toward a RandomX variant with its own parameters, which would reverse the 2026-03-25 SHA-256 entry for the PoW hash. Stock RandomX would let Monero's hashrate, and the market that rents it, point at this chain at once; Argon2 makes checking a block cost a full hash, about 50 to 100 ms at 64 MB, against 10 to 20 ms in RandomX's 256 MB light mode. Desktops and laptops mine; phones don't, since one does about 1/30 to 1/100 of a desktop's RandomX hashrate and both app stores forbid mining on the device. A memory-hard check would also reopen the 2026-10-27 bad-PoW entry, which counts on checking the work costing one SHA-256. The cost: someone has to choose the miners, and the chain stops when none of them is online.
+
 **2026-11-08: Blocking is a filter in the client, with no on-chain block.**
 A user hides an account, or one post or comment, in their own client; the chain doesn't change, and taking someone off the network is the allow list's job. An on-chain `Block` tx was weighed: consensus would reject a blocked account's replies under the blocker's posts, so no one would see them, but the state would gain a block set per account, renewed within `R`, every block would be public, and the new tx type needs a new genesis. The cost: a blocked account can still reply under your posts, and everyone else sees those replies.
 
@@ -123,13 +126,14 @@ Spam is handled by identity gating and/or per-tx PoW.
 
 ## Open
 
-1. Open mining or a permissioned miner set. Leaning permissioned: forks would be rarer, so `FINALITY_DEPTH` and `MAX_TIPS` could be smaller. With no block rewards, open mining may draw little honest hashrate, which makes the chain cheap to out-mine.
+1. Settled: mining is permissioned through Phase 3 (2026-11-08, above).
 2. How spam is limited: identity gating, per-tx PoW, or both. Leaning toward invite-only signup, with one invite per account per period, counted in blocks rather than wall-clock time. Leaning toward getting there in stages: the allow list as a node setting first, then an on-chain allow list edited by a 2-of-3 threshold admin key, then member invites on top of it, each a restart from a new genesis while the network is small.
 3. Max post body size. Provisionally 1,024 bytes, about 1,000 characters of English text or 250 emoji. At that size a full block holds about 120 posts.
 4. Settled: accounts are forgotten (2026-10-24, above).
 5. Recovering from a fork deeper than `FINALITY_DEPTH`. A split longer than 12 minutes (a partition, or a miner that kept mining offline) leaves nodes on different chains for good. Options include an operator command to switch forks, and miners pausing when they have no peers.
 6. How a new node finds the real chain without blocks back to genesis: keep every header (about 100 MB a year, no content), or ship checkpoints.
 7. How the app and network get updated, including which settings can change without restarting the network. A restart is acceptable but should be rare.
+8. Which PoW if mining opens. Leaning toward a RandomX variant (2026-11-08, above). SHA-256 on GPUs stays in the running if enough honest people with good GPUs mine to outweigh what an attacker can rent. RandomX wins if many ordinary users mine, but botnets favor it and rarely have GPUs, so measure how many people actually mine before choosing.
 
 ## Assumptions
 

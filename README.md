@@ -43,6 +43,7 @@ One branch and PR per item. Tick it when it merges.
 
 **Phase 2: two nodes talking**
 
+- [ ] Permissioned miners: only miners in an approved set can make blocks ([decisions](docs/decisions.md#decided)). Test: a block from a miner outside the set is rejected, and so is one whose proof of its miner fails.
 - [ ] Two local nodes mine, gossip, post, comment, delete, and read
 - [ ] Per-block difficulty retargeting from recent block times. Test: in a simulation where hashrate jumps 10× up or down, block time is back within 10% of 30 s after one window of blocks; a block with any other difficulty is rejected.
 - [ ] Measure fork rate and fork depth, and set `FINALITY_DEPTH` from them
@@ -63,10 +64,10 @@ One branch and PR per item. Tick it when it merges.
 **Later, only if needed:**
 
 - Faster block propagation, if forks are common: send the header and tx IDs only, since peers already have the txs in their mempool
-- Permissioned miner set, if forks are common: fewer, known miners means fewer races ([open question 1](docs/decisions.md#open))
 - Invite-only signup, if spam calls for it ([open question 2](docs/decisions.md#open))
 - Admin key storage, before the on-chain allow list: investigate where to keep its three keys, each in a separate place, so one lost or leaked key can neither sign nor lock the list; and a CI check that fails a PR committing a private key or seed.
 - On-chain allow list, once every node must enforce it: `Allow` txs signed by a 2-of-3 threshold admin key, entries renewed within `R`, replacing the node setting. Restart from a new genesis. Member invites then build on it: an `Allow` is also valid when an allowed account signs it within its invite quota.
+- Open mining once honest hashrate is large, leaning toward a RandomX variant ([open question 8](docs/decisions.md#open)). With RandomX, rate-limit and ban peers that send bad PoW, since a check costs about 10 to 20 ms instead of one SHA-256, and revisit the 2026-10-27 bad-PoW entry.
 - Lock-free reads, if profiling shows contention
 - Compact likes, if they crowd posts out of blocks: a full block holds about 935 likes of 140 bytes, 64 of them signature. A miner groups likes by target and aggregates their signatures, so a like costs well under 140 bytes. Plain Ed25519 signatures don't combine, so this needs half-aggregation or a scheme such as BLS.
 
