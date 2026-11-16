@@ -44,7 +44,7 @@ Protocol constants, which every node must agree on:
 
 Node limits, which peers don't need to agree on: `MAX_TIPS` = 64 forks tracked at once, the mempool byte cap (§7), the orphan caps and the invalid set's cap (§4).
 
-Key crates: `imbl` (persistent maps, so snapshots share structure) and `primitive-types` (U256 work). The node adds `tokio`, plus a crate for its client API once Phase 3 picks one (JSON-RPC with `jsonrpsee` is the current idea).
+Key crates: `imbl` (persistent maps, so snapshots share structure) and `primitive-types` (U256 work). The node adds `tokio`, and `jsonrpsee` for its client API (§12).
 
 ## 2. Modules
 
@@ -498,3 +498,15 @@ One mutex for now. If reads end up waiting on validation, move to one writer tas
 | Spam | Identity gating and/or per-tx PoW | Open question 2 |
 | Out-mining honest miners | Permissioned miners ([decisions](decisions.md#decided)) | Phase 2 |
 | Invite farming | Rate limit by block height | With invites |
+
+## 12. Client API
+
+The node serves one client API, JSON-RPC 2.0 over HTTP POST with `jsonrpsee`, to the CLI and the web UI alike. Clients hold their own keys and sign their own txs; the node never holds a user's key ([decisions](decisions.md#decided)).
+
+- `submit_tx` takes the tx's canonical encoding (§3) as hex and returns its `TxId`. The encoding has one form per value and no trailing bytes, so the node decodes it with the codec it uses for blocks, and there's no JSON shape of `Tx` to keep in step. The largest tx is 32 + 8 + (4 + 32 + 1 + 32 + 8 + 1,024) + 64 = 1,205 bytes, a comment with `reply_to` set and a full body, so 2,410 hex characters.
+- Reads return JSON, with IDs and keys in hex and bodies as strings, since step 6 makes every body UTF-8.
+- The CLI encodes and signs with `chain`. The web UI encodes the signed bytes in about 40 lines of JS and signs with the browser's WebCrypto Ed25519, so it runs no WASM. One known-answer vector per `TxPayload` variant, read by both the Rust tests and the JS, keeps the two encoders in step: `Like` and `Delete` would share a layout, so a wrong variant index would turn a like into a valid delete. The vectors pin signed bytes and `TxId`s and verify signatures rather than compare them, since Safari signs with a random nonce; the `TxId` leaves the signature out, so the tx is the same either way.
+- Browsers offer WebCrypto only on loopback or HTTPS, and keep a page's stored key per scheme, host and port, so the node serves the web UI there on a fixed port. `jsonrpsee` answers only POST, so the UI's files come from an HTTP layer in front of it on the same listener.
+- The web UI generates a key, shows its 32-byte seed once for backup and for the CLI, then stores a copy that page scripts can't export. A script running in the page can sign while it's open but can't take the key. Whoever serves the page's code can sign as its user, so a user trusts the node that serves the UI.
+
+Which callers may reach which methods, and from which sites, is the security roadmap item's.
