@@ -1,10 +1,15 @@
-//! Accepting a block: one already stored, held or known invalid is dropped; one whose header
-//! fails on its own, or whose body misses its header's root, is dropped without being
-//! remembered; one whose parent is unknown waits in the store's orphan pool; one that fails
-//! against its parent, in its txs or in applying them is remembered as invalid with every orphan
-//! waiting on it; the rest get their state built on their parent's, and the best tip is the one
-//! with the most total work, first seen on a tie. A reorg is a change of `best`; nothing is
-//! undone. Pruning and the mempool come with later items. See design §4 and §5.
+//! Accepting a block. Each block ends one of five ways (design §4):
+//! - Dropped (`AlreadySeen`): already stored, held as an orphan or known invalid.
+//! - Rejected: its header fails, or its body doesn't match the header's root. Not remembered,
+//!   so the same block is checked again if it comes back.
+//! - Held (`Orphaned`): its parent is unknown, so it waits in the orphan pool.
+//! - Remembered as invalid: it fails against its parent, in its txs or when applied, and so
+//!   does every orphan waiting on it.
+//! - Stored (`Stored`): everything else. The best tip has the most work; on a tie, the first
+//!   seen wins.
+//!
+//! A reorg only changes `best`; nothing is undone. Pruning and the mempool come with later
+//! items. See design §4 and §5.
 
 use std::sync::Arc;
 
