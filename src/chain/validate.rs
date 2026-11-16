@@ -1,7 +1,7 @@
 //! The checks that need no state: the header, its timestamp against the parent's chain, and the
 //! txs. Pure functions: the caller passes the clock reading and the recent timestamps. The
-//! manager runs them in order, `check_header` first, since it keeps the tx encoders below from
-//! panicking on an oversize block. See design §4, steps 2, 5 and 6.
+//! manager runs `check_header` first, since it keeps the encoders below from panicking on an
+//! oversize block. See design §4, steps 2, 5 and 6.
 
 use std::num::NonZeroU64;
 
@@ -30,15 +30,17 @@ pub enum BlockError {
     )]
     TimestampAhead { timestamp: u64, now: u64 },
     /// Only a block built in this process can be oversize: decoding caps at `MAX_BLOCK_BYTES`.
-    /// Checked so `check_txs`'s encoders can't panic. A local bug, so there is nothing to remember.
+    /// Checked so the encoders in `check_root` and `check_txs` can't panic. A local bug, so there
+    /// is nothing to remember.
     #[error("the block does not encode within {MAX_BLOCK_BYTES} bytes")]
     Oversize,
     // check_parent
     #[error("timestamp {timestamp} is not after the median {median} of recent blocks")]
     TimestampNotAfterMedian { timestamp: u64, median: u64 },
-    // check_txs
+    // check_root
     #[error("tx_root {header:?} is not the txs' merkle root {txs:?}")]
     TxRootMismatch { header: Hash, txs: Hash },
+    // check_txs
     #[error("tx {tx:?} has a {len}-byte body, outside 1..={MAX_BODY_BYTES}")]
     BodyLength { tx: TxId, len: usize },
     #[error("tx {0:?} has a body that is not UTF-8")]
@@ -91,10 +93,9 @@ pub fn check_parent(header: &BlockHeader, recent_timestamps: &[u64]) -> Result<(
     Ok(())
 }
 
-/// Checks the txs on their own. The merkle root first, so every later failure follows from txs
-/// the header committed to. Call `check_header` first: an oversize block would panic the
-/// encoders here. See design §4, step 6.
-pub fn check_txs(block: &Block) -> Result<(), BlockError> {
+/// Checks that the txs are the ones the header commits to. Call `check_header` first: an
+/// oversize block can panic the encoder here. See design §4, step 2.
+pub fn check_root(block: &Block) -> Result<(), BlockError> {
     let txs = merkle_root(&block.txs);
     if block.header.tx_root != txs {
         return Err(BlockError::TxRootMismatch {
@@ -102,6 +103,13 @@ pub fn check_txs(block: &Block) -> Result<(), BlockError> {
             txs,
         });
     }
+    Ok(())
+}
+
+/// Checks the txs on their own: format, body size and signatures. Call `check_root` first, so
+/// every failure here follows from txs the header committed to, and `check_header` before that:
+/// an oversize block can panic the encoders here. See design §4, step 6.
+pub fn check_txs(block: &Block) -> Result<(), BlockError> {
     block.txs.iter().try_for_each(check_tx)
 }
 
@@ -167,8 +175,8 @@ mod tests {
         hash.0.iter().map(|b| format!("{b:02x}")).collect()
     }
 
-    /// Block 1 of this chain, mined offline once at `DIFFICULTY` (a debug build hashes at
-    /// 0.08 MH/s, so tests never mine). Passes all three steps.
+    /// Block 1 of this chain, mined once at the test `DIFFICULTY` with its nonce pinned, so the
+    /// hex below is a known answer. Passes all three steps.
     fn block_1() -> Block {
         Block {
             header: BlockHeader {
@@ -177,7 +185,7 @@ mod tests {
                 timestamp: 1_767_225_630, // genesis + 30 s
                 tx_root: merkle_root(&[]),
                 difficulty: DIFFICULTY,
-                nonce: 3_731_462,
+                nonce: 7,
             },
             txs: vec![],
         }
@@ -213,7 +221,7 @@ mod tests {
         }
     }
 
-    /// `check_txs` reads only the header's `tx_root`.
+    /// A block over `txs`, with the root they hash to.
     fn block(txs: Vec<Tx>) -> Block {
         Block {
             header: BlockHeader {
@@ -227,10 +235,10 @@ mod tests {
     #[test]
     fn bad_headers_are_errors_naming_the_check() {
         let b = block_1();
-        // Computed outside Rust: 22 leading zero bits.
+        // Computed outside Rust: exactly 4 leading zero bits, the target's edge.
         assert_eq!(
             hex(&b.header.id().0),
-            "00000348ef22a60aa0e6ca20f7b010e67b52268cecc57f1392cb7525cea8c377"
+            "0e8eda80557581cf5b78bf61dd7dcf5f7f76ff536f1831507571c086ee6b621e"
         );
         let t = b.header.timestamp;
         assert_eq!(check_header(&b, t), Ok(()));
@@ -248,12 +256,12 @@ mod tests {
                 t,
                 BlockError::WrongDifficulty(one),
             ),
-            // 21 leading zero bits, one short of the target. Also ahead of the clock: the work is
+            // 3 leading zero bits, one short of the target. Also ahead of the clock: the work is
             // checked first. See design §4.
             (
                 Block {
                     header: BlockHeader {
-                        nonce: 5_069_833,
+                        nonce: 19,
                         ..block_1().header
                     },
                     ..block_1()
@@ -387,17 +395,6 @@ mod tests {
         );
         let not_utf8 = post(1, &[0xff]);
         let table = [
-            // block_1's empty root over a tx: the root is checked before the tx. See design §4.
-            (
-                Block {
-                    txs: vec![not_utf8.clone()],
-                    ..block_1()
-                },
-                BlockError::TxRootMismatch {
-                    header: merkle_root(&[]),
-                    txs: merkle_root(std::slice::from_ref(&not_utf8)),
-                },
-            ),
             (
                 block(vec![delete.clone(), empty.clone()]),
                 BlockError::BodyLength {

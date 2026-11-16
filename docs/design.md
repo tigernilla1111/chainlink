@@ -243,16 +243,16 @@ pub struct ChainManager {
 
 ## 4. Accepting a block
 
-Checks run cheapest first so bad blocks are rejected early.
+Checks run cheapest first so bad blocks are rejected early, with one exception: the merkle root is checked before the parent lookups, so that a held orphan always carries the body its header commits to (§11).
 
 | # | Check | Notes |
 |---|---|---|
 | 1 | Already seen? | Stored, held as an orphan or known-invalid → drop |
-| 2 | Header on its own | `difficulty` equals the fixed difficulty and the header hash is at most `U256::MAX / difficulty` (§3), timestamp not too far ahead of the local clock (checked after PoW), size limits |
+| 2 | Header on its own, body against it | `difficulty` equals the fixed difficulty and the header hash is at most `U256::MAX / difficulty` (§3), timestamp not too far ahead of the local clock (checked after PoW), size limits, then the txs' merkle root equals `tx_root` |
 | 3 | Parent known? | No → hold as orphan |
 | 4 | Parent usable? | Invalid → mark invalid. Below the horizon → drop |
 | 5 | Header vs parent | Height is parent + 1 (the store checks it before step 7, since `apply_block` asserts it), timestamp after the median of the last `MEDIAN_BLOCKS` timestamps ending at the parent (fewer near genesis); the median is `sorted[n / 2]`, the upper middle for an even count |
-| 6 | Txs on their own | Merkle root, format (a post or comment body is non-empty UTF-8), body size, signatures (`verify_strict`) |
+| 6 | Txs on their own | Format (a post or comment body is non-empty UTF-8), body size, signatures (`verify_strict`) |
 | 7 | Txs against state | Applied in block order (below), each within its height window |
 | 8 | Commit | Insert, update tips, fork choice, prune |
 
@@ -271,7 +271,7 @@ A tx meets these checks, and the step 6 ones, at up to three moments: on arrival
 
 **What gets remembered as invalid.** Only failures that follow from the header, or from txs that match its `tx_root`: a failed header-vs-parent check, or a tx breaking a rule. A body that doesn't match `tx_root` may be a peer's doing, and a timestamp ahead of the local clock may just be early, so those blocks can be tried again. A header with the wrong difficulty or too little work isn't remembered either: checking it again costs the one hash that looking up its ID would, and remembering it would let anyone push real entries out of the set for free. `tx_root` uses a merkle tree that never duplicates a leaf, so two different tx lists can't share a root, and its leaves cover the signatures, so a peer can't swap one under an unchanged root. The set holds 4,096 IDs, oldest dropped first ([decisions](decisions.md)).
 
-**Orphans** (blocks whose parent hasn't arrived) are held keyed by the missing parent. When that parent is accepted, its orphans are processed, and theirs in turn; if it turns out invalid, they are marked invalid with it, since a child of an invalid block is invalid. The pool is capped by total bytes (16 MB), count per parent (4, [decisions](decisions.md)) and age (60 s, checked as each block arrives, with the clock the caller passes), each dropping the oldest first, and step 2 makes every orphan carry real work.
+**Orphans** (blocks whose parent hasn't arrived) are held keyed by the missing parent. When that parent is accepted, its orphans are processed, and theirs in turn; if it turns out invalid, they are marked invalid with it, since a child of an invalid block is invalid. The pool is capped by total bytes (16 MB), count per parent (4, [decisions](decisions.md)) and age (60 s, checked as each block arrives, with the clock the caller passes), each dropping the oldest first, and step 2 makes every orphan carry real work and the body its header commits to, so a copy with a forged body can't take an honest block's place in the pool (§11).
 
 ## 5. Fork choice and reorg
 
@@ -489,6 +489,7 @@ One mutex for now. If reads end up waiting on validation, move to one writer tas
 | Flood of orphans | Orphan pool caps; orphans must carry real PoW | Now |
 | Resending invalid blocks | Remember invalid block IDs, capped | Now |
 | Getting an honest block marked invalid | Remember only failures that follow from the header or its `tx_root`, whose leaves cover the signatures | Now |
+| Forged body shadowing an honest block | Root checked before a block is held, so a held orphan carries the body its header commits to | Now |
 | Many shallow forks | `MAX_TIPS` | Now |
 | Deep reorg | `FINALITY_DEPTH` | Now |
 | Huge posts | `MAX_BODY_BYTES` | Now |
