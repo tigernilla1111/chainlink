@@ -25,8 +25,11 @@ pub const TX_TTL: u64 = 120;
 // `R + 1` blocks.
 const _: () = assert!(TX_TTL <= R);
 /// The fixed difficulty, 2^22 expected hashes per block. Every header must carry it until
-/// Phase 2's per-block retarget replaces the equality check in `validate`. See design §1.
-pub const DIFFICULTY: NonZeroU64 = NonZeroU64::new(1 << 22).unwrap();
+/// Phase 2's per-block retarget replaces the equality check in `validate`. Under `cargo test` it
+/// is 2^4, so a test block mines in about 16 hashes: a debug build hashes at about 0.12 MH/s, and
+/// 2^22 would take about 35 s a block. See design §1.
+pub const DIFFICULTY: NonZeroU64 =
+    NonZeroU64::new(if cfg!(test) { 1 << 4 } else { 1 << 22 }).unwrap();
 /// Largest post or comment body, in UTF-8 bytes. The value is provisional. See design §1.
 pub const MAX_BODY_BYTES: usize = 1024;
 /// How far past the local clock a block's timestamp may be, in seconds. The value is
